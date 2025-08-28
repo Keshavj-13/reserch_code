@@ -1,0 +1,40 @@
+
+# === TimeGAN-Driven Drive Cycle Extension Block ===
+# Requires: timegan_wrapper.py in the same folder + TimeGAN repo in PYTHONPATH
+
+from timegan_wrapper import timegan_main_custom
+import numpy as np
+import pandas as pd
+
+# Parameters
+timegan_multiplier = 1.5  # e.g. 1.5 = +50% synthetic data
+seq_len = 24              # TimeGAN sequence length
+epochs = 500              # Training epochs for TimeGAN
+
+# Step 1: Prepare original drive speed data
+speed_data = drive_df["Speed"].values.reshape(-1, 1)
+
+# Step 2: Generate new sequences
+generated_speed = timegan_main_custom(speed_data, seq_len=seq_len, gen_ratio=(timegan_multiplier - 1), epochs=epochs)
+
+# Step 3: Create extension DataFrame
+ext_df = pd.DataFrame({
+    "Speed": generated_speed.flatten(),
+    "Time": np.arange(len(drive_df), len(drive_df) + len(generated_speed))
+})
+
+# Step 4: Concatenate with original drive cycle
+drive_df = pd.concat([drive_df, ext_df], ignore_index=True)
+
+# Step 5: Recompute derived features
+drive_df["Speed"] = pd.to_numeric(drive_df["Speed"], errors="coerce").fillna(0)
+drive_df["Speed_mps"] = drive_df["Speed"] * 0.44704
+drive_df["Acceleration"] = drive_df["Speed_mps"].diff().fillna(0)
+drive_df["Power_W"] = (1600 * drive_df["Speed_mps"] * drive_df["Acceleration"]).clip(lower=0)
+
+# Step 6: Update time series simulation inputs
+time = np.arange(len(drive_df))
+power_input = drive_df["Power_W"].values
+timesteps = len(time)
+
+print(f"✅ Drive cycle extended to {timesteps} steps using TimeGAN (×{timegan_multiplier})")
