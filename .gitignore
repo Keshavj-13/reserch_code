@@ -26,6 +26,9 @@ env/
 checkpoints/
 *.csv
 
+# Large drive cycles folder
+drive_cycles/
+
 # Logs and databases
 *.log
 *.sqlite3
