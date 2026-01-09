@@ -1,0 +1,25 @@
+name: battery-cooling
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - numba
+  - pint
+  - xarray
+  - tqdm
+  - uncertainties
+  - pip
+  - pip-tools
+  - python-dotenv
+  - jupyter
+  - jupyterlab
+  - ipykernel
+  - pip:
+    - pybamm
+    - tensorflow
+    - coolprop
