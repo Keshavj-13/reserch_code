@@ -26,6 +26,10 @@ env/
 checkpoints/
 *.csv
 
+# Large data files
+*.npy
+*.npz
+
 # Large drive cycles folder
 drive_cycles/
 
