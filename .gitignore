@@ -25,6 +25,7 @@ env/
 # Checkpoints / generated data
 checkpoints/
 *.csv
+*.txt
 
 # Large data files
 *.npy
