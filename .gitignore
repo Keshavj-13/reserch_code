@@ -38,6 +38,39 @@ drive_cycles/
 *.log
 *.sqlite3
 
+# Ignore generated images outside the manuscript folder
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.svg
+!paper/*.png
+!paper/*.jpg
+!paper/*.jpeg
+!paper/*.webp
+!paper/*.svg
+!paper/figures/*.png
+!paper/figures/*.jpg
+!paper/figures/*.jpeg
+!paper/figures/*.webp
+!paper/figures/*.svg
+
+# LaTeX build artifacts
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.toc
+*.out
+*.lot
+*.lof
+*.nav
+*.snm
+
+# LaTeX PDF outputs generated during editing
+main.pdf
+paper/main.pdf
+
 # Pytest
 .pytest_cache/
 
