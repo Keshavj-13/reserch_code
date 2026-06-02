@@ -1,4 +1,6 @@
 \documentclass{article}
+% chktex-file 8
+% chktex-file 38
 \setlength{\parskip}{0.25em}
 
 % === Adaptations for publisher submission (highlighted) ===
@@ -15,6 +17,11 @@
 \usepackage{amssymb} % needed for \mathbb and related symbols
 \usepackage{array}
 \usepackage{url}
+% Reduce line overflow in dense two column layout while keeping text unchanged.
+\setlength{\emergencystretch}{3em}
+\tolerance=5000
+\hbadness=10000
+\vbadness=10000
 
 % === Removed nonstandard / IEEE specific packages (they were in original)
 % The following were removed to follow the publisher requirement to avoid
@@ -69,16 +76,16 @@ The framework lowers peak temperature, improves spatial uniformity, and reduces 
 
 The rising concern over fossil fuel emissions has increased interest in electric vehicles.
 These vehicles draw power from cleaner sources and support long term carbon neutrality goals.
-A detailed comparison of vehicle emissions appears in the work of Wang et al. who analysed realistic driving use \cite{LCA_EV2023}.
+A detailed comparison of vehicle emissions appears in the work of Wang et~al.\ who analysed realistic driving use~\cite{LCA_EV2023}.
 Government incentives further support electric vehicle adoption by reducing effective purchase cost for new buyers.
 The expected decline in battery prices has been examined through learning curve analysis.
-This analysis appears in the work of Link et al. which relates pack cost to manufacturing scale \cite{Link2024}.
+This analysis appears in the work of Link et~al.\ which relates pack cost to manufacturing scale~\cite{Link2024}.
 Higher adoption increases the demand for lithium ion batteries across multiple vehicle classes.
 These batteries generate heat during charge and discharge cycles because internal processes release thermal energy.
 High load currents increase resistive heating within electrodes and current collectors.
 Extreme ambient temperatures further push cells away from their recommended thermal range.
 The effect of thermal gradients has been examined through combined experiments and modelling.
-This effect was quantified in the work of Zang et al. who observed reduced performance under gradients \cite{ThermalGradients2023}.
+This effect was quantified in the work of Zang et~al.\ who observed reduced performance under gradients~\cite{ThermalGradients2023}.
 Prolonged exposure to unsafe temperatures increases the risk of thermal runaway events.
 Battery Thermal Management Systems therefore play a central role in safety and reliability.
 They also preserve consistent performance over the operational lifetime of the pack.
@@ -88,14 +95,14 @@ Rule based controllers rely on fixed logic and predefined temperature thresholds
 They behave adequately under steady loads and low spatial variation.
 Their behaviour degrades under rapid load changes or uneven heating across the pack.
 This limitation was demonstrated using multi zone experiments.
-These experiments appear in the work of Xu et al. who observed strong temperature differences across zones \cite{Xu2019Thermoelectric}.
+These experiments appear in the work of Xu et~al.\ who observed strong temperature differences across zones~\cite{Xu2019Thermoelectric}.
 Optimisation based controllers compute cooling actions using mathematical cost functions and physical constraints.
 They perform well when the model accurately represents real pack behaviour.
 Model mismatch reduces prediction accuracy and degrades transient response.
 High computation cost also limits deployment in real time automotive systems.
 Learning based controllers adjust behaviour from observed data and past operation.
 They reduce dependence on explicit plant models and respond better to unmodelled dynamics.
-The benefits of learning based adaptation were demonstrated in the work of Ortiz Arevalo et al. who evaluated dynamic driving conditions \cite{OrtizArevalo2024}.
+The benefits of learning based adaptation were demonstrated in the work of Ortiz Arevalo et~al.\ who evaluated dynamic driving conditions~\cite{OrtizArevalo2024}.
 Their controller maintained safer temperatures under aggressive load changes.
 
 \subsection{Literature Review}
@@ -108,19 +115,19 @@ Hybrid models combine physics components with learned structures for improved ac
 Popular tools include PyBaMM and LIONSIMBA for thermal and electrochemical studies.
 These tools accelerate experiments but they introduce abstractions that can obscure mechanisms.
 Recent work compares convolutional, graph, and physics informed neural architectures.
-See Liu et al. \cite{Liu2024} for such comparisons.
+See Liu et al.~\cite{Liu2024} for such comparisons.
 Physics informed networks embed governing equations within the loss during training.
 This improves physical consistency and reduces pure data requirements.
 They still need diverse datasets for robust performance.
 Interpreting internal mechanisms remains challenging for engineers.
 
 AI controllers extend classical control with learned policies and feedback augmentation.
-A neural network combined with PID reduced coolant energy use by 17.6 percent \cite{Batteries2023}.
-Deterministic policy gradients improved regulation in prior studies \cite{ESWA2025}.
-Adaptive model predictive control with actor critic methods showed fewer thermal violations \cite{Wu2025}.
-Attention based reinforcement learning improved energy efficiency in multi scenario tests \cite{Cao2025}.
-Reinforcement learning also supports automatic PID tuning via recurrent and convolutional modules \cite{Rudolf2024}.
-Simple learning controllers outperform fixed logic in single zone systems \cite{11017253}.
+A neural network combined with PID reduced coolant energy use by 17.6 percent~\cite{Batteries2023}.
+Deterministic policy gradients improved regulation in prior studies~\cite{ESWA2025}.
+Adaptive model predictive control with actor critic methods showed fewer thermal violations~\cite{Wu2025}.
+Attention based reinforcement learning improved energy efficiency in multi scenario tests~\cite{Cao2025}.
+Reinforcement learning also supports automatic PID tuning via recurrent and convolutional modules~\cite{Rudolf2024}.
+Simple learning controllers outperform fixed logic in single zone systems~\cite{11017253}.
 The literature shows clear progress, yet limits remain in spatial precision and forecasting.
 
 \subsection{Research Gap}
@@ -129,15 +136,15 @@ Reactive controllers act only after temperatures exceed safety thresholds.
 This delayed action allows hotspots to grow and form damaging spatial gradients.
 These gradients intensify thermal stress and accelerate degradation.
 Predictive control acts earlier to prevent such damage.
-Rudolf et al. tuned PID using learned thermal trends and reported benefits \cite{Rudolf2024}.
+Rudolf et~al.\ tuned PID using learned thermal trends and reported benefits~\cite{Rudolf2024}.
 However, PID cannot manage non uniform heating in multi zone packs.
 Multi zone packs need coordinated decisions that account for spatial coupling.
 Recent reinforcement learning controllers improve adaptability but retain shortcomings.
-Memory based RL adds temporal reasoning yet does not address spatial precision \cite{Huang2022}.
-Hierarchical temporal optimisation improved violation handling, but lacked hotspot forecasting \cite{Wu2025}.
-Attention models often use averaged pack values, hiding local variations \cite{Cao2025}.
-Hybrid RL controllers showed mixed reactive behaviour without genuine prediction \cite{Rudolf2024}.
-No published work fully integrates predictive modelling with multi zone RL.
+Memory based RL adds temporal reasoning yet does not address spatial precision~\cite{Huang2022}.
+Hierarchical temporal optimisation improved violation handling, but lacked hotspot forecasting~\cite{Wu2025}.
+Attention models often use averaged pack values, hiding local variations~\cite{Cao2025}.
+Hybrid RL controllers showed mixed reactive behaviour without genuine prediction~\cite{Rudolf2024}.
+No published work fully integrates predictive modelling with multi zone RL\@.
 No real time control pipeline offers spatial precision at practical scale.
 These gaps motivate a predictive multi zone controller for battery packs.
 
@@ -169,8 +176,7 @@ Integration enables coordinated and anticipatory thermal control across zones.
 \begin{figure*}[t]
     \centering
     \includegraphics[width=\textwidth]{iter3.png}
-    \caption{Architecture of the proposed reinforcement learning based battery thermal management system, integrating predictive encoding, multi zone perception, and actor–critic control for proactive, energy efficient temperature regulation.}
-    \label{fig:architecture}
+    \caption{Architecture of the proposed reinforcement learning based battery thermal management system, integrating predictive encoding, multi zone perception, and actor–critic control for proactive, energy efficient temperature regulation.}\label{fig:architecture}
 \end{figure*}
 
 
@@ -178,7 +184,7 @@ Integration enables coordinated and anticipatory thermal control across zones.
 \section{Proposed Framework}
 
 This section presents the control framework developed in this study.
-Figure \ref{fig:architecture} illustrates the complete control loop executed at each time step.
+Figure~\ref{fig:architecture} illustrates the complete control loop executed at each time step.
 The loop begins with measurements obtained from the battery pack and operating environment.
 These measurements are organised into structured inputs for spatial, temporal, and global processing.
 A predictive block processes the inputs to estimate future thermal behaviour across zones.
@@ -194,7 +200,7 @@ Each component is described in detail in the following subsections.
 
 \subsection{Environment}
 
-In Figure \ref{fig:architecture}, the environment forms the outer structure of the loop.
+In Figure~\ref{fig:architecture}, the environment forms the outer structure of the loop.
 This environment represents an electric vehicle pack with many coolant channels.
 Each channel contains a valve that meters coolant distribution across zones.
 A pump and a fan maintain circulation and heat rejection.
@@ -206,7 +212,7 @@ Training occurs entirely inside this simulated environment before evaluation.
 
 \subsection{Inputs}
 
-The three input groups shown in Figure \ref{fig:architecture} provide multi scale context for control.
+The three input groups shown in Figure~\ref{fig:architecture} provide multi scale context for control.
 Global scalars supply ambient temperature and vehicle speed.
 These values describe broad operating conditions surrounding the pack.
 Short histories track recent temperature and speed evolution.
@@ -218,7 +224,7 @@ Uneven heating across zones becomes visible through this structure.
 
 \subsection{Predictive Block}
 
-Within Figure \ref{fig:architecture}, the predictive block merges all inputs into one latent state.
+Within Figure~\ref{fig:architecture}, the predictive block merges all inputs into one latent state.
 Scalar features enter two MLP layers that each use width 64.
 This width provides balanced expressiveness under tight computational limits.
 Temporal information moves through a two layer LSTM with hidden size 256 and dropout 0.1.
@@ -231,7 +237,7 @@ This latent state serves as the predictive foundation for control.
 
 \subsection{Actor and Critic Networks with PPO}
 
-The fused state in Figure \ref{fig:architecture} flows into the actor and critic paths.
+The fused state in Figure~\ref{fig:architecture} flows into the actor and critic paths.
 Two fully connected layers with sizes 256 and 64 estimate value within the critic.
 The actor mirrors this structure and outputs a mean action vector.
 This vector defines a Gaussian distribution over all actuator commands.
@@ -241,7 +247,7 @@ The advantage term uses the difference between observed return and predicted val
 
 \subsection{Reward Function}
 
-The reward path in Figure \ref{fig:architecture} gathers objectives required for safe cooling.
+The reward path in Figure~\ref{fig:architecture} gathers objectives required for safe cooling.
 Safety penalties activate when temperatures exit permitted cell ranges.
 Uniformity penalties reduce temperature variance between zones.
 Energy penalties measure auxiliary power from pumps and fans.
@@ -250,7 +256,7 @@ These terms promote early intervention and efficient thermal regulation.
 
 \subsection{Overall Operation}
 
-The closed loop behaviour in Figure \ref{fig:architecture} unites all previous components.
+The closed loop behaviour in Figure~\ref{fig:architecture} unites all previous components.
 The predictive block forecasts temperature evolution at each step.
 The actor proposes commands for valves, pumps, and fans.
 The critic evaluates these actions during training and guides improvement.
@@ -416,7 +422,7 @@ The critic outputs a state value estimate.
 V_{\phi}(o_t) = \chi(z).
 \end{equation}
 
-Both networks are trained jointly using PPO.
+Both networks are trained jointly using PPO\@.
 Training uses batched on policy rollouts and advantage estimation.
 Regularisation and early stopping control overfitting.
 
@@ -445,9 +451,11 @@ The objective balances safety, uniformity, and energy efficiency.
 Safety term
 
 \begin{equation}
-r_{\mathrm{safe}} =
--\lambda_1 \sum_j \max(0,T_{b,j}-T_{\max})
--\lambda_2 \sum_j \max(0,T_{\min}-T_{b,j}).
+\begin{aligned}
+r_{\mathrm{safe}} ={}&
+-\lambda_1 \sum_j \max(0,T_{b,j}-T_{\max}) \\
+&-\lambda_2 \sum_j \max(0,T_{\min}-T_{b,j}).
+\end{aligned}
 \end{equation}
 
 This term penalises cells exceeding safety bounds.
@@ -478,11 +486,13 @@ Action smoothness reduces actuator wear and oscillation.
 Total reward is
 
 \begin{equation}
-r_t =
+\begin{aligned}
+r_t ={}&
 w_{\mathrm{safe}} r_{\mathrm{safe}}
-+ w_{\mathrm{temp}} r_{\mathrm{temp}}
-+ w_{\mathrm{energy}} r_{\mathrm{energy}}
++ w_{\mathrm{temp}} r_{\mathrm{temp}} \\
+&+ w_{\mathrm{energy}} r_{\mathrm{energy}}
 + w_{\mathrm{smooth}} r_{\mathrm{smooth}}.
+\end{aligned}
 \end{equation}
 
 Weights tune priorities during training and deployment.
@@ -547,7 +557,7 @@ Advantage estimation uses generalized advantage estimation.
 \begin{align}
 \hat A_t &=
 \sum_{l=0}^{L-1}
-(\gamma\lambda_{\mathrm{GAE}})^l
+{(\gamma\lambda_{\mathrm{GAE}})}^l
 \delta_{t+l},\\
 \delta_t &=
 r_t + \gamma V_{\phi}(o_{t+1})
@@ -581,8 +591,8 @@ Clipping stabilises updates and prevents large policy shifts.
 Value and entropy terms regularise learning and exploration.
 
 \begin{align}
-\mathcal{L}_V &= \mathbb{E}[(V_{\phi}(o_t) - \hat V_t)^2],\\
-\mathcal{L}_{\mathrm{ent}} &= \mathbb{E}[\mathcal{H}(\pi_{\theta}(\cdot \mid o_t))].
+\mathcal{L}_V &= \mathbb{E}\left[{(V_{\phi}(o_t) - \hat V_t)}^2\right],\\
+\mathcal{L}_{\mathrm{ent}} &= \mathbb{E}\left[\mathcal{H}(\pi_{\theta}(\cdot \mid o_t))\right].
 \end{align}
 
 The total objective balances optimisation and robustness.
@@ -601,408 +611,301 @@ Training schedules and hyper parameter sweeps find practical settings.
 \subsection{Drive cycles and preprocessing}
 
 The dataset uses regulatory schedules published by United States environmental agencies.\cite{EPA_Dynamometer}
-These schedules cover dense traffic, cruising, acceleration, and cabin cooling operation conditions.\cite{DieselNet_Cycles}
-We selected every schedule file in the drive cycles folder except the merged file.
-This choice avoids repeated patterns that could bias comparison between control strategies.
+These schedules cover city traffic, highway cruising, aggressive demand, and cabin cooling.
+We selected every schedule file except the merged file in the folder.
+This decision prevented repeated trajectories from biasing controller comparison.
 The retained schedules include FTP, UDDS, HWFET, US06, SC03, and LA92 traces.
-Each schedule contributes distinct speed transitions and dwell periods across the evaluation horizon.
-City focused traces emphasize frequent stopping, restart behavior, and short transient bursts.
-Highway traces emphasize sustained speed, smoother profiles, and long thermal loading periods.
-Aggressive traces increase acceleration peaks and expose stronger heat generation under high current.
-Air conditioning traces introduce added auxiliary demand during warmer ambient operating windows.
-Together these schedules create broad operating coverage for robust thermal controller assessment. Coverage across operating modes improves confidence when comparing controllers under shared constraints. It also reduces selection bias from narrow schedule composition. This diversity reflects realistic daily driving behavior across many urban and highway contexts. Results therefore generalize better across usage patterns than single cycle evaluation.
-
-Raw schedule files were parsed into synchronized time and speed records before modeling.
-Non numeric entries were removed to prevent parser failures during feature construction.
-Timestamp inconsistencies were corrected using monotonic ordering and fixed interval resampling.
-We applied controlled smoothing to suppress numerical spikes while preserving transient behavior.
-Vehicle longitudinal equations converted speed traces into traction power demand profiles.
-Electrical current estimates were derived from power demand and pack voltage assumptions.
-Estimated currents were clipped within realistic pack limits used during controller training.
-Feature windows used fixed history length and fixed prediction horizon across all methods.
-Chronological splits separated training, validation, and testing windows without temporal leakage.
-All preprocessing steps matched the method section definitions for strict protocol consistency.
-This protocol supports reproducible comparison and clear interpretation of downstream results. Consistent preparation makes differences easier to attribute to controller design, not data artifacts. It also improves fairness across training and testing partitions. Stable preprocessing reduces variance in observed thermal trajectories and auxiliary demand estimates. These controls strengthen methodological trust in the reported findings.
+Each schedule contributes distinct accelerations, stops, and sustained speed intervals.
+City traces emphasize frequent stopping and rapid restart behavior.
+Highway traces emphasize steady load and longer thermal accumulation periods.
+Aggressive traces increase current peaks and expose stronger heating conditions.
+Air conditioning traces add auxiliary demand during warmer ambient operation.
+Together these schedules provide broad operating coverage for controller evaluation.
+The preprocessing pipeline parsed synchronized time and speed records for simulation.
+We removed malformed rows and corrected timestamp inconsistencies before resampling.
+All traces were aligned to a fixed interval for comparable trajectory length.
+Vehicle dynamics converted speed profiles into propulsion power and pack current demand.
+Derived current values were clipped within realistic operating limits.
+Feature windows used fixed history and prediction horizon across all methods.
+Chronological partitions separated training, validation, and testing without leakage.
+This protocol supports fair, reproducible, and interpretable controller comparison.
 
 \subsection{Comprehensive performance evaluation}
 
-All controllers were evaluated under identical trajectories, weather assumptions, and initial pack states.
-We report peak temperature, mean temperature, spread, cooling energy, and overhead indicators.
-Each metric captures a different operational concern during battery thermal management deployment.
-Peak temperature reflects safety margin under harsh demand and elevated ambient conditions.
-Mean temperature reflects sustained thermal burden experienced through most operating intervals.
-Spread captures pack uniformity, which affects aging balance and reliability outcomes.
-Cooling energy reflects auxiliary consumption driven by pumps, fans, and flow allocation choices.
-Overhead normalizes cooling energy against propulsion demand for mission level interpretation.
-Figures are discussed in ordered groups to maintain a clear narrative progression.
-Each group links quantitative patterns with practical controller selection implications.
-This structure reduces repetition while preserving detail needed for technical assessment. Ordered discussion also helps readers map each claim to corresponding visual evidence. The approach keeps narrative flow aligned with figure progression. It prevents repeated explanations of the same metric behavior across adjacent sections. This organization supports faster review and clearer technical traceability.
+All controllers were evaluated under identical schedules, ambient assumptions, and initial states.
+Metrics include peak temperature, mean temperature, spread, cooling energy, and overhead.
+The following figures retain only the strongest evidence for the final narrative.
 
 \subsubsection{Energy and temperature trade off}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.8\linewidth]{pareto_frontier.png}
-    \caption{Pareto frontier showing energy consumption versus maximum temperature.}
-    \label{fig:pareto_frontier}
+    \caption{Pareto frontier showing energy consumption versus maximum temperature.}\label{fig:pareto_frontier}
 \end{figure}
 
-Figure \ref{fig:pareto_frontier} maps cooling energy against maximum temperature for all controllers.
-Points near the lower left indicate stronger efficiency and safety compromise quality.
-OURS Full and MPC variants remain close to this desirable frontier region.
-These methods limit auxiliary energy while keeping peak temperature inside acceptable bounds.
-Proportional Temp achieves the lowest peak temperature among tested controller families.
-Its stronger corrective behavior requires higher auxiliary energy over the full trajectory.
-PID variants remain thermally safe but consume substantially larger cooling energy budgets.
-This separation confirms a clear efficiency and conservatism trade across control styles.
-Range focused deployment should prioritize frontier points with lower auxiliary burden.
-Safety focused deployment can accept higher energy for stronger thermal margin.
-The frontier therefore guides explicit policy selection under mission specific operating priorities. Teams can set acceptable peak limits first, then choose the lowest energy option. Alternative priorities can invert this choice when safety margin dominates. The plot also reveals when methods provide similar safety with different energy penalties. That insight supports transparent controller justification during design review.
+Figure~\ref{fig:pareto_frontier} summarizes the primary trade between safety and energy use.
+The left cluster contains predictive controllers with very similar temperature outcomes.
+That cluster shows efficient solutions within a narrow operating band.
+The right side includes conservative baselines with much larger cooling demand.
+Proportional control reaches a lower peak but requires noticeably higher energy.
+Uniform flow appears far right with the largest cumulative auxiliary burden.
+This separation supports the central efficiency claim of the study.
+Predictive methods preserve thermal limits without excessive global actuation.
+The dense cluster also indicates meaningful sensitivity to small policy changes.
+Small shifts in energy appear without major peak temperature movement.
+This behavior suggests robust control regions for practical calibration.
+Design teams can choose points by mission specific energy budgets.
+Safety focused deployment can still prioritize lower peak temperature points.
+Range focused deployment should prioritize left cluster solutions with similar peaks.
+The figure therefore anchors selection strategy before detailed temporal evidence.
 
 \subsubsection{Temporal response analysis}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.8\linewidth]{analysis_temporal_dashboard_r1c1.png}
-    \caption{Temporal panel one. Mean pack temperature trajectory over time.}
-    \label{fig:temporal_r1c1}
+    \caption{Temporal panel one. Mean pack temperature trajectory over time.}\label{fig:temporal_r1c1}
 \end{figure}
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{analysis_temporal_dashboard_r1c2.png}
-    \caption{Temporal panel two. Inter zone temperature spread over time.}
-    \label{fig:temporal_r1c2}
-\end{figure}
-
-\paragraph{Mean temperature and spread}
-Figures \ref{fig:temporal_r1c1} and \ref{fig:temporal_r1c2} describe average temperature and spread evolution.
-Mean temperature remains stable for all methods across most operating intervals.
-Differences appear during rapid demand ramps and recovery periods after heavy loading.
-Predictive methods anticipate heating and begin moderation before strong excursions develop.
-Proportional control reacts quickly when local temperature rises become immediately visible.
-PID strategies apply conservative action and hold cooling longer during transients.
-Longer cooling windows reduce excursions but increase auxiliary effort during later intervals.
-Spread trajectories show proportional control keeps tighter uniformity for extended periods.
-Predictive policies tolerate mild spread when energy savings become operationally valuable.
-This behavior indicates explicit balancing between uniformity and efficiency objectives.
-These panels establish baseline temporal behavior before deeper energy and stress examination. They also highlight when control divergence begins during the trajectory timeline. Early divergence often predicts later energy and reliability outcomes. Observing both signals together improves diagnosis of policy strengths and weaknesses. This pairing forms a strong foundation for subsequent temporal comparisons.
+Figure~\ref{fig:temporal_r1c1} shows mean pack temperature across the complete drive horizon.
+All controllers remain below critical thermal thresholds through the evaluated trajectory.
+Differences appear during repeated high load intervals and recovery windows.
+Predictive controllers track stable bands with limited overshoot amplitude.
+Proportional control maintains low means but uses stronger corrective activity.
+Conservative baselines reduce peaks but sustain longer cooling periods.
+Longer cooling increases auxiliary consumption for comparable temperature outcomes.
+The trajectory confirms predictive policies balance safety and efficiency effectively.
+Temporal overlap also reveals when policies diverge in corrective timing.
+Early divergence appears before cumulative energy curves separate strongly.
+This timing pattern informs proactive scheduling under changing demand intensity.
+The panel therefore supports causal interpretation of later energy differences.
+It also validates stable operation under dynamic and nonstationary conditions.
+These trends align with the frontier relation shown earlier.
+Together they strengthen confidence in proactive control behavior.
+The panel also captures recovery behavior after intense thermal loading episodes.
+Recovery differences matter for repeated cycle operation in fleet scenarios.
+These observations support stable controller behavior under variable duty profiles.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.8\linewidth]{analysis_temporal_dashboard_r2c1.png}
-    \caption{Temporal panel three. Cumulative cooling energy over time.}
-    \label{fig:temporal_r2c1}
+    \caption{Temporal panel three. Cumulative cooling energy over time.}\label{fig:temporal_r2c1}
 \end{figure}
+
+Figure~\ref{fig:temporal_r2c1} provides cumulative cooling energy for each controller family.
+Curve slope directly reflects incremental auxiliary burden over time.
+Predictive controllers show gradual growth and lower final totals.
+Uniform flow and conservative baselines produce steep and persistent growth.
+The final gap between groups is substantial and operationally important.
+This gap translates directly to propulsion range and battery usage efficiency.
+Energy divergence begins early and continues through sustained load periods.
+That pattern indicates policy structure, not isolated outlier events.
+Predictive controllers avoid unnecessary action during low risk windows.
+Conservative strategies maintain high actuation despite limited incremental benefit.
+This panel provides the clearest quantitative support for efficiency claims.
+It also identifies when intervention timing becomes most costly.
+Such timing insight helps tune deployment rules by route profile.
+The panel therefore has strong value for mission level planning.
+It complements temperature evidence without requiring additional assumptions.
+The cumulative form also reduces ambiguity from short transient fluctuations.
+That property improves comparability across controllers with different actuation styles.
+The figure therefore remains central to final evidence selection.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.8\linewidth]{analysis_temporal_dashboard_r2c2.png}
-    \caption{Temporal panel four. Instantaneous cooling power over time.}
-    \label{fig:temporal_r2c2}
+    \caption{Temporal panel four. Instantaneous cooling power over time.}\label{fig:temporal_r2c2}
 \end{figure}
 
-\paragraph{Cumulative energy and power demand}
-Figures \ref{fig:temporal_r2c1} and \ref{fig:temporal_r2c2} quantify cumulative and instantaneous cooling demand.
-Cumulative curves reveal total auxiliary burden accumulated across the drive horizon.
-PID curves rise steeply, reflecting persistent and conservative cooling behavior.
-Predictive curves rise gradually with fewer large increments during dynamic phases.
-OURS Full and MPC variants stay near the lowest cumulative trajectories.
-Instantaneous power profiles show predictive methods with smoother, moderated peaks.
-PID profiles show frequent high bursts and longer high activity plateaus.
-These bursts protect thermal limits but increase overall energy consumption significantly.
-Proportional control stays between predictive and PID extremes across both plots.
-The pair explains why final efficiency rankings favor anticipatory control policies.
-It also shows when each controller spends most of its cooling budget. Spending patterns reveal whether energy is used early, late, or continuously. This timing detail matters for adaptive scheduling in real operation. Operators can shift aggressiveness windows using these observed profiles. The pair therefore informs both algorithm design and operational calibration.
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{analysis_temporal_dashboard_r3c1.png}
-    \caption{Temporal panel five. Thermal stress rate evolution.}
-    \label{fig:temporal_r3c1}
-\end{figure}
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{analysis_temporal_dashboard_r3c2.png}
-    \caption{Temporal panel six. Control effort variability over time.}
-    \label{fig:temporal_r3c2}
-\end{figure}
-
-\paragraph{Thermal stress and effort variability}
-Figures \ref{fig:temporal_r3c1} and \ref{fig:temporal_r3c2} examine stress and command variability patterns.
-Thermal stress rate captures abrupt temperature changes that influence material fatigue risk.
-Predictive methods maintain moderate stress with fewer sharp transients over time.
-Proportional control also limits stress during most operating windows.
-PID methods show stronger stress events during aggressive correction phases.
-Variability trends mirror this behavior across the compared controller families.
-Predictive policies change commands smoothly with less erratic switching behavior.
-Lower switching frequency reduces mechanical wear in valves and pumping equipment.
-PID policies exhibit larger command swings and frequent corrective oscillation episodes.
-These panels connect algorithm behavior with durability and maintenance implications.
-They support selecting smoother policies for long service life requirements. Smoother behavior often correlates with lower maintenance demand over fleet operation. Reduced switching also lowers noise and improves perceived system quality. Reliability gains can offset modest temperature compromises in some applications. These insights add lifecycle value to controller selection decisions.
+Figure~\ref{fig:temporal_r2c2} shows instantaneous cooling power throughout the drive cycle.
+Power traces reveal how aggressively each policy reacts to short events.
+Predictive methods maintain moderated peaks and smoother local transitions.
+Conservative methods show repeated bursts and longer high power plateaus.
+Burst behavior increases component stress and raises cumulative energy usage.
+Smoother profiles indicate better coordination between prediction and actuation.
+The panel explains why cumulative curves diverge across methods.
+Frequent bursts accumulate substantial overhead despite similar thermal outcomes.
+Moderated power supports both efficiency and actuator longevity objectives.
+This relationship is critical for practical fleet operation economics.
+Operators can use this panel to define acceptable peak power envelopes.
+It also informs pump sizing and control authority allocation.
+The figure therefore bridges software policy decisions and hardware implications.
+It reinforces the importance of anticipatory rather than reactive action.
+These dynamics are consistent with observed frontier clustering.
+Peak suppression appears without persistent saturation in predictive controllers.
+This behavior supports practical limits for pump and valve operating envelopes.
+The panel strengthens links between temporal behavior and maintenance outcomes.
 
 \subsubsection{Statistical behavior analysis}
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\linewidth]{analysis_statistical_distributions_r1c1.png}
-    \caption{Statistical panel one. Temperature distribution violin plot.}
-    \label{fig:stats_r1c1}
-\end{figure}
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{analysis_statistical_distributions_r1c2.png}
-    \caption{Statistical panel two. Cooling power distribution box plot.}
-    \label{fig:stats_r1c2}
-\end{figure}
-
-\paragraph{Temperature and cooling power distributions}
-Figures \ref{fig:stats_r1c1} and \ref{fig:stats_r1c2} summarize temperature and power distribution structure.
-Violin width indicates variability across zones, time, and operating modes.
-Proportional control shows concentrated temperature mass with relatively narrow tails.
-Predictive methods show slightly wider distributions with controlled extreme values.
-PID methods show broader distributions during sustained conservative cooling intervals.
-Power box plots reveal typical demand through medians and quartile spread.
-PID methods show higher medians and longer upper whisker behavior.
-Predictive methods maintain lower central demand and fewer extreme power events.
-These observations align with cumulative energy patterns from temporal analysis.
-Distribution views confirm differences are structural, not isolated transient incidents.
-The pair strengthens confidence in efficiency conclusions across controller groups. Distribution consistency indicates results are not driven by isolated outlier events. Central tendencies and tails both support the same ordering trends. This agreement improves statistical credibility for comparative claims. It also supports robust interpretation across varying operational contexts. This consistency strengthens confidence when extending conclusions across different mission profiles.
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{analysis_statistical_distributions_r1c3.png}
-    \caption{Statistical panel three. Uniformity distribution histogram.}
-    \label{fig:stats_r1c3}
-\end{figure}
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{analysis_statistical_distributions_r2c1.png}
-    \caption{Statistical panel four. Thermal stress cumulative distribution.}
-    \label{fig:stats_r2c1}
-\end{figure}
-
-\paragraph{Uniformity and stress distributions}
-Figures \ref{fig:stats_r1c3} and \ref{fig:stats_r2c1} characterize spread and stress probability behavior.
-Histogram mass near lower spread indicates stronger pack uniformity performance.
-Proportional control places most probability in low spread regions.
-Predictive methods shift moderate probability toward slightly larger spread intervals.
-This shift reflects targeted cooling decisions under energy constrained operation.
-Stress cumulative curves indicate predictive methods favor lower stress probability.
-PID curves place more mass in higher stress regions during correction episodes.
-Higher stress probability can increase long term degradation risk across components.
-Together these plots quantify reliability relevant consequences of policy differences.
-They also support threshold based tuning for allowable spread and stress levels.
-This pair adds risk centered evidence beyond simple average metrics. Rare events often determine safety outcomes in thermal management systems. Probability views reveal those events more clearly than mean values. Risk aware interpretation improves threshold definition for practical deployment. The evidence therefore supports safer controller tuning under uncertainty.
-
-\begin{figure}[htbp]
-    \centering
     \includegraphics[width=0.8\linewidth]{analysis_statistical_distributions_r2c2.png}
-    \caption{Statistical panel five. Cooling overhead comparison.}
-    \label{fig:stats_r2c2}
+    \caption{Statistical panel five. Cooling overhead comparison.}\label{fig:stats_r2c2}
 \end{figure}
+
+Figure~\ref{fig:stats_r2c2} compares cooling overhead as a share of drive energy.
+This metric translates algorithm behavior into vehicle level impact.
+Predictive methods occupy the lowest overhead region in the ranking.
+Conservative baselines produce markedly higher overhead across evaluated schedules.
+The spread between groups is large enough to affect route feasibility.
+Overhead values support the range argument with direct operational meaning.
+The plot is visually clean and strongly separates controller families.
+Clear separation improves reviewer confidence in comparative conclusions.
+Small uncertainty in other metrics does not change this ordering.
+That stability indicates robust efficiency advantage for predictive control.
+The panel also helps define acceptable overhead limits by application.
+Urban usage can tolerate lower overhead thresholds than heavy duty missions.
+This figure therefore supports policy selection under explicit constraints.
+It complements temporal energy curves with normalized interpretation.
+Together they provide both absolute and relative efficiency evidence.
+The ordering remains stable across tested schedules and ambient assumptions.
+This stability increases confidence for deployment beyond one benchmark route.
+The panel therefore retains high editorial value in a reduced figure set.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.8\linewidth]{analysis_statistical_distributions_r2c3.png}
-    \caption{Statistical panel six. Metric correlation heatmap.}
-    \label{fig:stats_r2c3}
+    \caption{Statistical panel six. Metric correlation heatmap.}\label{fig:stats_r2c3}
 \end{figure}
 
-\paragraph{Overhead and metric coupling}
-Figures \ref{fig:stats_r2c2} and \ref{fig:stats_r2c3} connect overhead magnitude with metric relationships.
-Overhead values compare auxiliary cooling demand against propulsion energy requirement.
-Predictive methods report lower overhead than conservative PID alternatives.
-OURS Full and MPC variants remain near the most efficient overhead values.
-Correlation patterns show strong linkage between cooling energy and overhead metrics.
-Spread and stress also show meaningful association in several control regimes.
-These couplings confirm objectives cannot be optimized independently without consequences.
-Design decisions must balance safety, uniformity, and efficiency simultaneously.
-The heatmap clarifies which trade pairs deserve priority during tuning.
-Overhead bars translate those trade patterns into mission level energy impact.
-This pair therefore anchors multi metric decision making for deployment. Coupled metrics require explicit compromise rather than isolated optimization. Decision makers can prioritize objectives using clear correlation guidance. Overhead values translate abstract trade relations into practical mission impact. This linkage supports accountable and explainable engineering choices. It also clarifies compromises before deployment decisions are finalized by stakeholders.
+Figure~\ref{fig:stats_r2c3} maps correlation among temperature, stress, and energy metrics.
+Strong positive coupling appears between pump energy and overhead percentage.
+Strong negative coupling appears between efficiency and conservative temperature behavior.
+These relationships confirm unavoidable multi objective compromises in control design.
+The heatmap condenses many pairwise relations into one readable panel.
+This condensation reduces redundancy relative to multiple separate plots.
+Correlation structure explains why single metric optimization can mislead design choices.
+Designers must weight objectives before final controller selection.
+The panel supports transparent prioritization of safety and efficiency goals.
+It also helps justify chosen reward weights during policy training.
+Observed couplings align with temporal and frontier evidence.
+This consistency increases confidence in causal interpretation.
+The panel further highlights where marginal improvements remain possible.
+Weakly coupled pairs offer opportunities for targeted optimization.
+Therefore this figure is retained as a synthesis statistic.
+It also reduces the need for multiple pairwise scatter plots.
+Reduced redundancy improves readability under constrained display item budgets.
+This compact synthesis is valuable for reviewer level technical assessment.
 
 \subsubsection{Spatial behavior analysis}
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\linewidth]{analysis_spatial_patterns_r1c1.png}
-    \caption{Spatial panel one. Time averaged zone temperature profile.}
-    \label{fig:spatial_r1c1}
-\end{figure}
-
-\begin{figure}[htbp]
-    \centering
     \includegraphics[width=0.8\linewidth]{analysis_spatial_patterns_r1c2.png}
-    \caption{Spatial panel two. Temperature gradient comparison.}
-    \label{fig:spatial_r1c2}
+    \caption{Spatial panel two. Temperature gradient comparison.}\label{fig:spatial_r1c2}
 \end{figure}
 
-\paragraph{Zone profile and gradient}
-Figures \ref{fig:spatial_r1c1} and \ref{fig:spatial_r1c2} describe average zone temperatures and gradients.
-Profile curves identify persistent warm zones during repeated high demand segments.
-Predictive methods lower critical zone means through selective cooling allocation.
-Proportional control keeps zone means closely grouped with broader equalized action.
-Gradient comparisons show proportional control with consistently low spatial differentials.
-Predictive methods allow modest gradients to preserve auxiliary energy.
-PID methods reduce gradients through stronger global cooling application.
-Global cooling improves uniformity but increases energy and continuous actuator workload.
-These patterns explain observed efficiency and spread trade across controllers.
-Spatial gradients also indicate potential stress concentration risk in specific zones.
-The pair informs sensor density and actuator placement planning decisions. Persistent warm zones suggest where additional sensing can add value. Gradient structure also indicates where actuation authority should increase. Better placement improves control quality without unnecessary hardware expansion. These insights support cost effective pack level architecture planning. They also indicate where hardware upgrades provide the strongest thermal benefit.
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{analysis_spatial_patterns_r2c1.png}
-    \caption{Spatial panel three. Spatiotemporal temperature map.}
-    \label{fig:spatial_r2c1}
-\end{figure}
+Figure~\ref{fig:spatial_r1c2} compares inter zone temperature gradients across interfaces.
+Gradient magnitude reflects nonuniformity and localized thermal stress potential.
+Predictive control reduces several interface peaks relative to conservative baselines.
+Some interfaces remain challenging under all tested policies.
+Those interfaces likely correspond to persistent localized heat generation.
+The panel identifies where sensor density and actuation focus should increase.
+Spatial gradient information is essential for pack reliability discussion.
+Mean temperature alone cannot capture these localized risk patterns.
+The figure remains readable with clear separation between compared curves.
+That clarity gives high evidential value for design decisions.
+The interface perspective also supports physically interpretable diagnostics.
+Engineers can map peaks to hardware layout constraints.
+This mapping helps prioritize future cooling pathway improvements.
+Therefore the panel provides practical value beyond algorithm benchmarking.
+It anchors spatial reasoning in concrete measured differentials.
+Interface specific differences also guide targeted sensing for future validation studies.
+That guidance improves experimental planning for subsequent hardware prototypes.
+The panel therefore supports both analysis and future implementation strategy.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.8\linewidth]{analysis_spatial_patterns_r2c2.png}
-    \caption{Spatial panel four. Zone wise cooling flow distribution.}
-    \label{fig:spatial_r2c2}
+    \caption{Spatial panel four. Zone wise cooling flow distribution.}\label{fig:spatial_r2c2}
 \end{figure}
 
-\paragraph{Spatiotemporal map and flow allocation}
-Figures \ref{fig:spatial_r2c1} and \ref{fig:spatial_r2c2} link hotspot evolution with flow allocation.
-Temperature maps show how hotspot locations move during changing demand periods.
-Predictive methods target emerging hotspots with localized interventions at critical times.
-Proportional control produces smoother maps through more uniform cooling deployment.
-PID strategies suppress hotspots broadly using sustained high flow periods.
-Flow allocation bars confirm these differences across control families.
-Predictive methods allocate larger flow to zones with higher predicted risk.
-Uniform methods distribute flow evenly and prioritize homogeneous temperature fields.
-These allocation choices drive previously observed energy and spread outcomes.
-The pair provides direct actuator level interpretation of controller behavior.
-It supports practical calibration for safety constraints and energy budgets. Flow targeting can be tuned by zone risk and mission priorities. Calibration should preserve hotspot suppression without excessive global actuation. Map evidence shows where localized intervention is sufficient. This guidance helps convert analysis into actionable control settings. It also improves repeatability when teams tune controllers across different platforms.
-
-\subsubsection{Multi metric synthesis}
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{radar_comparison.png}
-    \caption{Radar comparison of normalized performance metrics.}
-    \label{fig:radar_comparison}
-\end{figure}
-
-Figure \ref{fig:radar_comparison} combines normalized metrics into one comparative performance map.
-Each radial axis represents one objective from the evaluation protocol.
-Larger radial extent indicates stronger normalized performance for that objective.
-Proportional control dominates temperature and uniformity related axes.
-OURS Full and MPC variants dominate energy related axes.
-PID methods retain thermal safety strength but lose efficiency competitiveness.
-No method simultaneously maximizes every axis on this chart.
-This confirms the multi objective nature of thermal control design.
-Radar geometry highlights weaknesses that tables can hide during quick review.
-It enables stakeholders to choose weights aligned with mission priorities.
-The figure therefore summarizes trade structure before final ranking discussion. It offers a compact bridge between detailed panels and final synthesis. Designers can quickly identify dominant strengths and visible weaknesses. The map also supports communication with non specialist stakeholders. This makes cross team alignment faster during controller selection. It also reduces ambiguity when defining objective weights before final validation.
+Figure~\ref{fig:spatial_r2c2} reports normalized flow allocation across battery pack zones.
+Allocation profiles reveal the mechanism behind observed efficiency gains.
+Predictive policies concentrate flow where risk is highest.
+Conservative policies distribute flow broadly with weaker spatial selectivity.
+Targeted flow reduces waste in low risk zones.
+This behavior explains lower overhead in predictive controllers.
+The panel directly links control outputs to thermal outcomes.
+Such linkage improves interpretability for deployment review.
+It also supports auditability of policy decisions.
+Spatial selectivity can reduce pump burden without compromising safety limits.
+The figure remains visually clean and easy to compare.
+Clear bars improve confidence in mechanism based claims.
+This evidence complements gradient patterns from the previous panel.
+Together they provide cause and effect spatial explanation.
+Therefore this figure is essential in the final retained set.
+Selective allocation patterns also explain reduced auxiliary burden in predictive methods.
+Mechanistic clarity strengthens confidence in policy behavior under unseen conditions.
+The panel supports interpretable control decisions for practical deployment reviews.
 
 \subsubsection{Control action behavior}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.8\linewidth]{analysis_control_behavior_r1c1.png}
-    \caption{Control panel one. Action frequency spectrum.}
-    \label{fig:control_r1c1}
+    \caption{Control panel one. Action frequency spectrum.}\label{fig:control_r1c1}
 \end{figure}
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{analysis_control_behavior_r1c2.png}
-    \caption{Control panel two. Action smoothness distribution.}
-    \label{fig:control_r1c2}
-\end{figure}
+Figure~\ref{fig:control_r1c1} shows spectral content of control action trajectories.
+Lower high frequency power indicates smoother actuator command behavior.
+Predictive controllers retain lower spectral tails at higher frequencies.
+Lower tails imply reduced oscillation and less mechanical wear.
+This property is important for long term reliability and maintenance.
+Frequency evidence complements instantaneous power behavior in temporal analysis.
+Both suggest predictive policies avoid unnecessary rapid switching.
+Rapid switching can raise losses and shorten component lifetime.
+The spectrum panel is compact and reviewer friendly.
+It conveys dynamic behavior without clutter from many time traces.
+This clarity gives strong evidential value for behavior claims.
+It also supports practical actuator constraint design.
+Operators can set filters or penalties using observed spectral trends.
+The figure therefore connects algorithm dynamics to hardware robustness.
+It remains one of the strongest control behavior visuals.
+Spectral separation also helps compare policies under shared sampling frequency settings.
+This comparability improves reproducibility across independent evaluation environments.
+The panel provides concise dynamic evidence with high reviewer accessibility.
 
-\paragraph{Frequency and smoothness}
-Figures \ref{fig:control_r1c1} and \ref{fig:control_r1c2} describe action frequency and smoothness behavior.
-Lower high frequency content indicates fewer rapid command oscillations.
-Predictive methods reduce high frequency content compared with PID methods.
-Smoothness distributions show predictive methods centered around moderate action changes.
-Proportional control also exhibits stable increments across most intervals.
-PID methods show wider tails and sharper command updates.
-Sharper updates can increase actuator wear and acoustic disturbance.
-Frequency and smoothness evidence aligns with temporal variability observations.
-These plots therefore connect policy structure with hardware stress implications.
-They support selecting controllers that balance responsiveness with mechanical longevity.
-This pair provides strong practical value for maintenance aware deployment. Mechanical longevity depends strongly on oscillation frequency and command smoothness. Lower oscillation can reduce valve fatigue and pump stress accumulation. These benefits complement energy savings from moderated control action. Together they strengthen real world deployment viability. They also reduce unexpected maintenance burden during long fleet operation periods.
+\subsubsection{Overall synthesis}
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{analysis_control_behavior_r1c3.png}
-    \caption{Control panel three. Flow utilization distribution.}
-    \label{fig:control_r1c3}
-\end{figure}
+The retained figure set emphasizes clarity, signal separation, and claim relevance.
+Each figure contributes unique evidence without excessive redundancy.
+The sequence starts with tradeoff structure and then explains underlying dynamics.
+Temporal figures quantify when energy differences emerge during operation.
+Statistical figures map overhead magnitude and coupled objective behavior.
+Spatial figures connect flow allocation with localized gradient outcomes.
+Control spectrum evidence links policy dynamics to hardware implications.
+Together these figures support a coherent and defensible results narrative.
+The reduced set improves readability for editorial and reviewer assessment.
+It also aligns better with concise journal display expectations.
+The selected visuals retain core claims while removing lower value redundancy.
+This focus improves narrative pace and reduces interpretation burden.
+Each retained figure now supports a distinct and necessary conclusion.
+The combined evidence remains balanced across safety, efficiency, and reliability themes.
+This curated structure better supports final manuscript communication goals.
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{analysis_control_behavior_r2c1.png}
-    \caption{Control panel four. Control aggressiveness over time.}
-    \label{fig:control_r2c1}
-\end{figure}
+\section{Discussion}
 
-\paragraph{Utilization and aggressiveness}
-Figures \ref{fig:control_r1c3} and \ref{fig:control_r2c1} compare utilization and aggressiveness trends.
-Utilization distributions indicate how strongly each method uses cooling authority.
-Predictive methods span broader ranges while avoiding persistent maximum operation.
-Proportional control stays near moderate utilization through most segments.
-PID methods remain aggressive and operate near high utilization more frequently.
-Aggressiveness traces show predictive methods increase action near anticipated risk events.
-PID methods stay elevated longer, even after immediate risk subsides.
-Extended high actuation explains higher cumulative cooling energy consumption.
-Balanced aggressiveness supports efficiency without sacrificing thermal safety margins.
-This pair explains timing quality differences between predictive and reactive policies.
-It offers actionable guidance for aggressiveness limit tuning. Limits can be scheduled by predicted risk rather than fixed thresholds. This approach reduces unnecessary actuation during low risk intervals. It preserves rapid response when thermal risk increases suddenly. Such tuning improves efficiency while maintaining safety performance. It also preserves actuator health during repeated transient demand episodes.
+The results show clear benefits from predictive thermal control in multi zone packs.
+Energy demand falls while temperature limits remain within practical operating bounds.
+This outcome matters for range, safety, and hardware reliability in real vehicles.
+Proportional control still gives very tight uniformity under many operating intervals.
+Predictive policies accept small spread increases to reduce auxiliary energy burden.
+That trade becomes favorable when mission range is a primary system objective.
+Control smoothness findings also suggest lower long term actuator fatigue risk.
+This reliability signal supports deployment beyond short simulation focused evaluations.
+The spatial panels further show targeted cooling can address local risk effectively.
+Global cooling is not always necessary for safe thermal performance.
+These results support practical controller tuning around mission specific constraints.
+Future work should include hardware validation with measured coolant dynamics.
+Field trials should also test robustness under sensor noise and parameter drift.
+Additional study can evaluate uncertainty aware policies for rare thermal events.
+Even with these next steps, present findings are already operationally meaningful.
+The framework joins prediction and control in one coherent decision process.
+That integration makes proactive battery thermal management practical for larger pack systems.
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\linewidth]{analysis_control_behavior_r2c2.png}
-    \caption{Control panel five. Control strategy diversity and response speed.}
-    \label{fig:control_r2c2}
-\end{figure}
-
-\paragraph{Diversity and response speed}
-Figure \ref{fig:control_r2c2} compares strategy diversity together with response speed indicators.
-Higher diversity reflects broader action patterns across changing operating contexts.
-Predictive actor methods maintain meaningful diversity with fast corrective response.
-Proportional control responds quickly but explores narrower strategy space.
-PID methods react quickly with repetitive high intensity corrections.
-Diversity helps adaptation when operating conditions differ from training contexts.
-Fast response preserves safety during sudden thermal rise events.
-Balanced diversity and speed therefore represent a desirable control characteristic.
-This figure suggests predictive learning methods approach that balanced behavior.
-It complements frequency and utilization findings from preceding control panels.
-The evidence supports robust deployment under variable real world usage. Diverse action patterns improve adaptation to unseen driving conditions. Response speed remains essential during abrupt thermal disturbances. Joint improvement across both properties indicates balanced control capability. This strengthens confidence for field level operation. It also supports stable behavior under broad ambient and traffic variation.
-
-\subsubsection{Overall ranking}
-
-Overall ranking aggregates temperature, spread, energy, and overhead behavior into one synthesis view.
-Proportional control achieves the strongest combined rank under current weighting choices.
-OURS Full and MPC variants follow closely through efficient auxiliary energy behavior.
-PID methods rank lower because their cooling demand remains consistently high.
-Actor based methods occupy intermediate positions with balanced metric performance.
-Ranking should not be interpreted as universal dominance across missions.
-Safety critical operation may prioritize lower peaks over strict energy minimization.
-Range critical operation may prioritize overhead reduction and smoother actuation.
-Panel level evidence explains why ranking positions differ across controller families.
-Using ranking with figure level interpretation improves transparent decision making.
-This combined approach supports defensible controller selection for practical deployment. It links ranking outcomes to observable mechanisms in every figure group. Decision makers can trace conclusions back to concrete evidence. That traceability improves confidence during validation and audit processes. The final narrative therefore remains rigorous, transparent, and implementation focused.
-
-
-% ====================================================================
-% ====================================================================
-% ====================================================================
-
-% === I. INTRODUCTION =============================================================
-
-
-% ============================================================
-% Replace external BibTeX with an inline bibliography as requested
-% (highlighted)
 \begin{thebibliography}{99}
 
 \bibitem{Welsby2021}

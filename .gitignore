@@ -19,6 +19,12 @@ env/
 # VS Code
 .vscode/
 
+# Agent / local tooling
+.codex
+
+# Spreadsheet lock files
+.~lock.*#
+
 # Jupyter
 .ipynb_checkpoints/
 
@@ -30,6 +36,7 @@ checkpoints/
 # Large data files
 *.npy
 *.npz
+*.exe
 
 # Large drive cycles folder
 drive_cycles/
@@ -70,6 +77,23 @@ drive_cycles/
 # LaTeX PDF outputs generated during editing
 main.pdf
 paper/main.pdf
+main copy.pdf
+
+# Workspace-level analysis outputs
+results/
+nature_following_backup/
+
+# Nature following run artifacts
+nature_following/checkpoints/
+nature_following/crops/
+nature_following/figures/
+nature_following/metrics/
+nature_following/reports/
+nature_following/*.pdf
+nature_following/results/
+nature_following/replots_from_csv/
+nature_following/replots_nature/
+nature_following/tags/
 
 # Pytest
 .pytest_cache/
