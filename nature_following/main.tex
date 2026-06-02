@@ -341,13 +341,25 @@ Smoothness penalties penalise large actuator command changes between consecutive
 These penalties reduce mechanical wear on pump valves and fan motor bearing surfaces.
 Oscillatory control behaviour that reduces net cooling efficiency is also discouraged by this term.
 
-Curriculum scheduling adjusts individual weight magnitudes across training stages progressively.
-Early training emphasises safety and uniformity to establish basic thermal regulation capability first.
-Later training increases energy and smoothness weights to refine efficiency under safe conditions.
-This staged schedule prevents the policy from sacrificing safety in pursuit of lower energy costs.
-Final weight values were selected through grid search on the validation drive cycle subset.
-The chosen weights produce the best balance of safety, efficiency, uniformity, and smoothness outcomes.
-Reward shaping through curriculum scheduling was essential for reliable convergence in early training.
+The implemented recovered training branch uses fixed reward weights throughout each training run.
+These fixed weights were selected to keep safety and spatial uniformity dominant while retaining penalties for energy use and abrupt valve changes.
+The chosen weights balance safety, efficiency, uniformity, and smoothness outcomes in the recovered comparison campaign.
+
+\begin{table}[!tb]
+\centering
+\caption{Reward weights used in the recovered training branch. Values are taken from `tags/recovered_physics_v1/core_physics_v1.py`.}\label{tab:reward_weights}
+\begin{tabular}{lll}
+\hline
+Term & Weight & Source component\\
+\hline
+\(w_{\mathrm{safe}}\) & 5.0 & Over/under temperature penalty\\
+\(w_{\mathrm{temp}}\) & 1.0 & Spatial standard deviation penalty\\
+\(w_{\mathrm{energy}}\) & 0.5 & Mean valve opening penalty\\
+\(w_{\mathrm{smooth}}\) & 0.1 & Squared valve change penalty\\
+\(\lambda\) terms & Folded into fixed weights & No separate runtime schedule\\
+\hline
+\end{tabular}
+\end{table}
 
 \subsection*{Overall Operation}
 
@@ -556,13 +568,34 @@ V_{\phi}(o_t) = \chi(z).
 $V_{\phi}(o_t)$ is the predicted value for observation $o_t$ under the current policy, produced by critic network $\chi(\cdot)$ with parameters $\phi$ from fused state $z$.
 This estimate enables advantage computation in the PPO clipped objective during each update.
 Both networks are updated jointly with gradients flowing back through all three encoder branches.
-Training uses batched on policy rollouts with generalised advantage estimation throughout.
-Regularisation through entropy bonuses and early stopping based on KL divergence controls overfitting.
+Training uses full episode on policy rollouts with generalised advantage estimation throughout.
+Regularisation through a fixed entropy bonus controls premature policy collapse.
+
+\begin{table}[!tb]
+\centering
+\caption{PPO training hyperparameters used in the recovered training branch. Values are traced to `run_phase_g_train.py`.}\label{tab:ppo_hyperparameters}
+\begin{tabular}{ll}
+\hline
+Hyperparameter & Value\\
+\hline
+Learning rate & \(3\times10^{-4}\)\\
+Clip ratio & 0.2\\
+Entropy coefficient start & 0.01\\
+Entropy coefficient end & 0.01\\
+GAE \(\lambda\) & 0.95\\
+Discount factor \(\gamma\) & 0.99\\
+Batch size & Full rollout, 6105 transitions\\
+Rollout length & 6105 steps\\
+Training epochs & 50 episodes per learned controller\\
+PPO update epochs & 4 passes per rollout\\
+\hline
+\end{tabular}
+\end{table}
 
 The Gaussian parameterisation has direct implications for exploration during policy training.
-Early training initialises the log standard deviation to produce wide action distributions.
+Training initialises the log standard deviation to \(-1.0\) for each action dimension.
 Wide distributions encourage broad exploration of the continuous valve and actuator command space.
-As training progresses, the standard deviations naturally decrease as the policy finds good commands.
+As training progresses, the learned standard deviations can decrease as the policy finds good commands.
 Decreasing spread reflects increasing confidence in the optimal cooling action for each state.
 Separate mean and spread outputs allow the policy to modulate exploration per actuator dimension.
 Channels with high reward sensitivity converge faster than those with diffuse gradient signals.
