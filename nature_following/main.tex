@@ -218,10 +218,10 @@ Thermal behaviour across a multi zone pack exhibits rich and structured spatial 
 Node features for each zone $j$ are assembled into a compact local feature vector
 
 \begin{equation}
-x^{\mathrm{node}}_j = [T_{b,j},\ T_{b,j}-\bar T_b,\ \mathrm{SOC}_j,\ I_{\mathrm{pack}},\ V_j,\ s_j].
+x^{\mathrm{node}}_j = [T_{b,j},\ T_{b,j}-\bar T_b,\ \mathrm{SOC}_j,\ I_{\mathrm{pack}},\ v_j,\ s_j].
 \end{equation}
 
-Within this vector, $T_{b,j}$ is the absolute temperature of cell group $j$ (\,\textdegree{}C), and $T_{b,j}-\bar T_b$ measures deviation from the instantaneous pack mean. The remaining entries are the local state of charge $\mathrm{SOC}_j$, pack current $I_{\mathrm{pack}}$ (treated as spatially uniform), zone voltage $V_j$, and positional index $s_j$. Including both absolute and relative temperature enables the encoder to distinguish local hot spots.
+Within this vector, $T_{b,j}$ is the absolute bulk battery temperature of cell group $j$ (\,\textdegree{}C), and $T_{b,j}-\bar T_b$ measures deviation from the instantaneous pack mean. The remaining entries are the local state of charge $\mathrm{SOC}_j$ (expressed as a fraction between 0 and 1), pack current $I_{\mathrm{pack}}$ (A, treated as spatially uniform), physical zone voltage $v_j$ (V), and positional index $s_j$. Including both absolute and relative temperature enables the encoder to distinguish local hot spots.
 
 Edge features between adjacent zones $i$ and $j$ describe pairwise physical coupling
 
@@ -229,7 +229,7 @@ Edge features between adjacent zones $i$ and $j$ describe pairwise physical coup
 x^{\mathrm{edge}}_{i\to j} = [d_{ij},\ k_{ij}^{\mathrm{cond}}].
 \end{equation}
 
-In this edge descriptor, $d_{ij}$ is the spacing between the thermal centres of zones $i$ and $j$, and $k_{ij}^{\mathrm{cond}}$ is their shared interface conductance. These two edge features quantify the strength and rate of pairwise conductive heat exchange. Zones with high conductance and short separation exchange heat rapidly under sustained load. The edge structure therefore encodes the physical thermal coupling topology of the pack directly.
+In this edge descriptor, $d_{ij}$ is the physical spacing (m) between the thermal centres of zones $i$ and $j$, and $k_{ij}^{\mathrm{cond}}$ is their shared interface thermal conductance (W/\,\textdegree{}C). These two edge features quantify the strength and rate of pairwise conductive heat exchange. Zones with high conductance and short separation exchange heat rapidly under sustained load. The edge structure therefore encodes the physical thermal coupling topology of the pack directly.
 
 Temporal context is assembled from a fixed length sliding window of recent measurements
 
@@ -304,7 +304,7 @@ PPO update epochs & 4 passes per rollout\\
 
 Cooling commands must operate over continuous ranges that span all possible actuator positions. A Gaussian policy provides smooth differentiable exploration over this full continuous action space. The actor outputs the parameters of this Gaussian at every control step during training. The critic outputs a scalar value estimate used to compute policy gradient advantages each step.
 
-The actor produces mean and log standard deviation vectors over all action dimensions
+The actor produces mean and log standard deviation vectors over all action dimensions. We formally define the fused latent control state $z \in \mathbb{R}^{448}$ as the concatenation of the spatial, temporal, and global embeddings, $z = [z_g, z_t, z_{\mathrm{glob}}]$.
 
 \begin{align}
 \mu &= \psi_{\mu}(z),\\
@@ -391,17 +391,17 @@ Weights $w_{\mathrm{safe}}$, $w_{\mathrm{temp}}$, $w_{\mathrm{energy}}$, and $w_
 
 The thermal dynamics model governs how zone temperatures evolve under cooling and electrical load. This model forms the core of the simulated environment used for policy training and evaluation. Its physical fidelity determines how reliably policies trained in simulation transfer to hardware. Three physical phenomena are explicitly captured resistive heating, convective cooling, and lateral conduction.
 
-Temperature evolution in each zone is governed by an energy conservation ordinary differential equation
+Temperature evolution in each zone over continuous time $\tau$ (seconds) is governed by an energy conservation ordinary differential equation
 
 \begin{equation}
 \begin{split}
-C_{b,j} \frac{dT_{b,j}}{dt} = &\dot Q_{\mathrm{gen},j} - \dot Q_{\mathrm{cool},j} \\
-&+ \sum_{k \in \mathcal{N}(j)} k_{jk}(T_{b,k} - T_{b,j}). 
+C_{b,j} \frac{dT_{b,j}}{d\tau} = &\dot Q_{\mathrm{gen},j} - \dot Q_{\mathrm{cool},j} \\
+&+ \sum_{m \in \mathcal{N}(j)} k_{jm}(T_{b,m} - T_{b,j}). 
 \end{split}
 \label{eq:energy_balance}
 \end{equation}
 
-In this balance, $C_{b,j}$ is lumped thermal capacitance (J/\,\textdegree{}C) for zone $j$, $\dot Q_{\mathrm{gen},j}$ is internally generated heat, and $\dot Q_{\mathrm{cool},j}$ is heat removed through the local cooling channel. Neighbour interactions are captured by adjacency set $\mathcal{N}(j)$ and interface conductance $k_{jk}$ between zones $j$ and $k$. The summation term models lateral conduction, transferring heat from hotter to cooler neighbours. This conduction term is what causes thermal gradients to propagate spatially across zones.
+In this balance, $C_{b,j}$ is lumped thermal capacitance (J/\,\textdegree{}C) for zone $j$, $\dot Q_{\mathrm{gen},j}$ is internally generated heat (W), and $\dot Q_{\mathrm{cool},j}$ is heat removed (W) through the local cooling channel. Neighbour interactions are captured by adjacency set $\mathcal{N}(j)$ and interface conductance $k_{jm}$ between zone $j$ and neighbour $m$. The summation term models lateral conduction, transferring heat from hotter to cooler neighbours. This conduction term is what causes thermal gradients to propagate spatially across zones.
 
 Thermal capacitance scales proportionally with the number of cells grouped into each zone
 
@@ -417,7 +417,7 @@ Resistive heat generation in each zone follows a quadratic dependence on pack cu
 \dot Q_{\mathrm{gen},j} = I_{\mathrm{pack}}^2 R_j. \label{eq:heat_gen}
 \end{equation}
 
-$R_j$ is the effective internal resistance aggregated for zone $j$. Variation in $R_j$ across zones produces spatially non uniform heat generation under identical current. This spatial non uniformity is the primary source of inter zone temperature gradients during driving. Entropic and regenerative heating contributions are omitted in this baseline thermal formulation.
+$R_j$ is the effective internal resistance ($\Omega$) aggregated for zone $j$. Variation in $R_j$ across zones produces spatially non uniform heat generation under identical current. This spatial non uniformity is the primary source of inter zone temperature gradients during driving. Entropic and regenerative heating contributions are omitted in this baseline thermal formulation.
 
 Convective cooling in each zone is modelled through a lumped overall conductance approach
 
@@ -425,7 +425,7 @@ Convective cooling in each zone is modelled through a lumped overall conductance
 \dot Q_{\mathrm{cool},j} = U_j A_j (T_{b,j} - T_{\mathrm{cool}}). \label{eq:cooling}
 \end{equation}
 
-For zone $j$, $U_j$ is the overall heat transfer coefficient, $A_j$ is active cooling area, and $T_{\mathrm{cool}}$ is inlet coolant temperature (assumed uniform at inlet). The product $U_j A_j$ is the effective thermal conductance that the controller modulates through valve commands.
+For zone $j$, $U_j$ is the overall heat transfer coefficient (W/(m$^2\cdot$\,\textdegree{}C)), $A_j$ is active cooling area (m$^2$), and $T_{\mathrm{cool}}$ is inlet coolant temperature (assumed uniform at inlet). The product $U_j A_j$ is the effective thermal conductance that the controller modulates through valve commands.
 
 The effective heat transfer coefficient for each zone depends on the local valve command
 
