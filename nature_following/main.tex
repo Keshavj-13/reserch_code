@@ -52,7 +52,7 @@
 \maketitle
 
 \begin{abstract}
-Battery packs in electric vehicles can accumulate heat quickly under dynamic drive conditions. When cooling decisions arrive late, thermal gradients widen, degradation accelerates, and safety margins shrink. Most existing strategies remain reactive and therefore miss the near term thermal evolution that determines these outcomes. We present a predictive multi zone reinforcement learning strategy for battery cooling that combines graph based spatial encoding, temporal memory, and global operating context. Spatial, temporal and global signals are fused into a latent representation from which the policy issues proactive valve and flow commands. The controller is trained with Proximal Policy Optimization (PPO) using reward terms that jointly encode safety and efficiency objectives. We benchmark the proposed model against a range of classical and learned (ablation) baselines across multiple regulatory drive schedules. Across the evaluated schedules, the proposed policy maintains temperatures within the 40\,\textdegree{}C safety threshold, reduces the maximum inter-zone temperature spread from 2.16\,\textdegree{}C to 1.07\,\textdegree{}C, and achieves significant energy savings compared to global cooling baselines. Overall, the results indicate that proactive predictive control is a viable and efficient route for real multi zone battery systems.
+Battery packs in electric vehicles can accumulate heat quickly under dynamic drive conditions. When cooling decisions arrive late, thermal gradients widen, degradation accelerates, and safety margins shrink. Most existing strategies remain reactive and therefore miss the near term thermal evolution that determines these outcomes. We present a predictive multi zone reinforcement learning strategy for battery cooling that combines graph based spatial encoding, temporal memory, and global operating context. Spatial, temporal, and global signals are fused into a latent representation that drives proactive valve and coolant flow control. The controller is trained with Proximal Policy Optimization (PPO) using reward terms that jointly encode safety and efficiency objectives. We benchmark the proposed model against a range of classical and learned (ablation) baselines across multiple regulatory drive schedules. Across the evaluated schedules, the proposed policy maintains temperatures within the 40\,\textdegree{}C safety threshold, reduces the maximum inter-zone temperature spread from 2.16\,\textdegree{}C to 1.07\,\textdegree{}C, and achieves significant energy savings compared to global cooling baselines. Overall, the results indicate that proactive predictive control is a viable and efficient route for real multi zone battery systems.
 \end{abstract}
 
 \section*{Introduction}
@@ -65,7 +65,7 @@ Classical Battery Thermal Management Systems (BTMS) strategies still divide broa
 
 The modelling landscape has matured in parallel. Analytical and reduced order models remain computationally attractive, data driven models capture complex patterns from large operational records, and hybrid variants attempt to combine both. Comparative studies now span convolutional, graph, and physics informed learning architectures \cite{AccessMPC2024, AccessILC2024, TSMC2025}. Even so, physically faithful and operationally interpretable prediction at pack scale is still difficult, especially when control decisions must be produced in real time.
 
-Recent AI based control studies report meaningful improvements, neural PID combinations have reduced coolant energy demand \cite{11017253, AccessILC2024}, deterministic policy gradient variants improved regulation \cite{Wu2025}, and actor critic or attention based formulations reduced thermal violations in demanding scenarios \cite{Cao2025, TVT2025_RLHMPC}. Yet a common limitation persists. Most policies remain predominantly reactive.
+Recent AI based control studies report meaningful improvements, neural PID combinations have reduced coolant energy demand \cite{11017253, AccessILC2024}, deterministic policy gradient variants improved regulation \cite{Wu2025}, and actor critic or attention based formulations reduced thermal violations in demanding scenarios \cite{Cao2025, TVT2025_RLHMPC}. Yet a common limitation persists, Most policies remain predominantly reactive.
 
 That matters because thermal dynamics are delayed and spatially coupled. Once hotspot growth is clearly visible in measured temperatures, a substantial part of the damage trajectory may already be underway. Prior memory augmented RL methods improve temporal context but do not consistently preserve zone level spatial information \cite{Huang2022}, hierarchical and attention based approaches can improve aggregate metrics, yet often rely on averaged pack signals that blur local behaviour \cite{Wu2025, Cao2025}. Existing hybrid RL designs likewise report mixed evidence of truly anticipatory operation \cite{TVT2023_Optimal, AccessMPC2024}.
 
@@ -73,9 +73,7 @@ Our reading of this gap is straightforward, prediction and control are usually t
 
 The significance of this work lies in integration. We found that combining spatial coupling, temporal evolution, and control optimisation in one end to end pipeline yields a compact predictive state that is expressive enough for zone level coordination but still efficient for real time use. The resulting policy reduces auxiliary cooling energy while maintaining competitive peak temperature behaviour across varied drive schedules, and the control trajectories are smoother, which may lower actuator fatigue over long operation windows.
 
-Equally important, the architecture is practical to evaluate and extend. By embedding prediction directly inside the policy loop and retaining physically meaningful action constraints, the approach provides a deployable route toward anticipatory pack conditioning in large multi zone battery systems.
-
-To evaluate this strategy, we developed a multi zone simulation environment and an integrated reinforcement learning pipeline, detailed in the following sections.
+Equally important, the architecture is practical to evaluate and extend. By embedding prediction directly inside the policy loop and retaining physically meaningful action constraints, the approach provides a deployable route toward anticipatory pack conditioning in large multi zone battery systems. To evaluate this strategy, we developed a multi zone simulation environment and an integrated reinforcement learning pipeline, detailed in the following sections.
 
 \section*{Methods}
 
@@ -201,7 +199,7 @@ System evolution at each discrete step is governed by a transition function
 x_{t+1} = f(x_t, a_t, u_t). \label{eq:transition}
 \end{equation}
 
-$x_t$ denotes the full thermal and electrical pack state at time $t$, while $a_t$ is the continuous cooling command issued at that step. Exogenous inputs are grouped in $u_t$, including ambient temperature, vehicle speed, and load profile. Function $f(\cdot)$ captures the coupled electrothermal dynamics of the battery pack model. It combines physics based heat transfer equations with empirically calibrated fitting parameters. The model is identified from simulation data rather than requiring full first principles derivation.
+This formulation models the thermal management problem as a discrete-time, closed-loop sequence under partial observability. $x_t$ denotes the full thermal and electrical pack state at time $t$, while $a_t$ is the continuous cooling command issued at that step. Exogenous inputs are grouped in $u_t$, including ambient temperature, vehicle speed, and load profile. Function $f(\cdot)$ captures the coupled electrothermal dynamics of the battery pack model. It combines physics based heat transfer equations with empirically calibrated fitting parameters. The model is identified from simulation data rather than requiring full first principles derivation.
 
 The controller accesses observations rather than the full internal state directly
 
@@ -212,6 +210,8 @@ o_t = g(x_t, u_t). \label{eq:observation}
 $o_t$ is the observation vector available to the policy at each control step, and $g(\cdot)$ selects the subset of $x_t$ that physical pack sensors can access. Sensor noise and measurement delay are implicitly absorbed into the definition of $g(\cdot)$. The observation includes zone temperatures, pack current, cell voltages, and global scalars. Partial observability is the fundamental challenge motivating the use of recurrent temporal encoders. Real packs cannot expose full internal state due to limited sensor instrumentation coverage. The policy must therefore infer unobserved thermal dynamics from sequential measurement histories. Recurrent encoders address this by maintaining a compressed learned estimate of hidden state. The graph encoder complements this by inferring inter zone heat flow from neighbour temperatures. Together the two encoders allow the policy to reason about unobserved thermal conditions effectively. This combined inference capability distinguishes the framework from simpler reactive control strategies.
 
 \subsection*{Observation Construction}
+
+The controller receives a heterogeneous observation tuple at each interval $t$, consisting of node, edge, historical, and global features. This combined tuple serves as the unified input $o_t$, allowing the policy to infer hidden thermal dynamics from sequential, multi-modal measurements.
 
 Thermal behaviour across a multi zone pack exhibits rich and structured spatial relationships. Adjacent cell groups exchange heat continuously through conductive interfaces in the module. A graph representation captures this topology and the neighbourhood coupling it defines physically. Nodes in the graph correspond to individual cell groups or thermal zones across the pack. Edges connect nodes that share a conductive interface or meaningful proximity coupling path. This representation encodes the physical layout of the pack directly into the input structure.
 
@@ -304,14 +304,14 @@ PPO update epochs & 4 passes per rollout\\
 
 Cooling commands must operate over continuous ranges that span all possible actuator positions. A Gaussian policy provides smooth differentiable exploration over this full continuous action space. The actor outputs the parameters of this Gaussian at every control step during training. The critic outputs a scalar value estimate used to compute policy gradient advantages each step.
 
-The actor produces mean and log standard deviation vectors over all action dimensions. We formally define the fused latent control state $z \in \mathbb{R}^{448}$ as the concatenation of the spatial, temporal, and global embeddings, $z = [z_g, z_t, z_{\mathrm{glob}}]$.
+The actor produces mean and log standard deviation vectors over all action dimensions. We formally define the fused latent control state $z \in \mathbb{R}^{448}$ as the concatenation of the spatial, temporal, and global embeddings, $z = [z_g, z_t, z_{\mathrm{glob}}]$. This shared predictive representation effectively compresses the multi-scale thermal context and serves as the direct input to both the actor and critic networks, bridging predictive inference with policy optimization.
 
 \begin{align}
 \mu &= \psi_{\mu}(z),\\
 \log \sigma &= \psi_{\sigma}(z).
 \end{align}
 
-The Gaussian mean is $\mu \in \mathbb{R}^{n_a}$ and per dimension spread is parameterised by $\log \sigma \in \mathbb{R}^{n_a}$. Networks $\psi_{\mu}$ and $\psi_{\sigma}$ share the same two hidden layers before separate output heads. Actions are sampled from the diagonal Gaussian $\mathcal{N}(\mu, \mathrm{diag}(\sigma^2))$ during training. During evaluation, $\mu$ is used directly as the deterministic optimal control command.
+The Gaussian mean is $\mu \in \mathbb{R}^{n_a}$ and per dimension spread is parameterised by $\log \sigma \in \mathbb{R}^{n_a}$. Here, the action space dimensionality is explicitly defined as $n_a=14$, which physically corresponds to the simultaneous, continuous modulation of twelve independent zone valves, one aggregate pump, and one radiator fan. Networks $\psi_{\mu}$ and $\psi_{\sigma}$ share the same two hidden layers before separate output heads. Actions are sampled from the diagonal Gaussian $\mathcal{N}(\mu, \mathrm{diag}(\sigma^2))$ during training. During evaluation, $\mu$ is used directly as the deterministic optimal control command.
 
 The critic estimates the expected discounted return from the current observation
 
