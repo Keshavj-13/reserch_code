@@ -1,0 +1,300 @@
+\documentclass[twocolumn]{article}
+% chktex-file 8
+% chktex-file 38
+\setlength{\parskip}{0.25em}
+
+% === Adaptations for publisher submission (highlighted) ===
+\usepackage[utf8]{inputenc} % new: ensure standard encoding
+\usepackage{geometry} % new: simple page geometry for submission
+\geometry{margin=1in} % new: reasonable default margins
+
+% graphics and math (kept)
+\usepackage[pdftex]{graphicx}
+\graphicspath{{./}{figures/}{../results/replots_from_csv/}{../results/replots_nature/}}
+\DeclareGraphicsExtensions{.pdf,.jpeg,.png}
+
+\usepackage[cmex10]{amsmath}
+\usepackage{amssymb} % needed for \mathbb and related symbols
+\usepackage{array}
+\usepackage{url}
+\usepackage[strings]{underscore}
+\usepackage{flafter} % do not place floats before their declaration
+\usepackage{stfloats}
+
+% Float tuning for better text-figure proximity in two-column layout.
+\setcounter{topnumber}{2}
+\setcounter{dbltopnumber}{2}
+\setcounter{totalnumber}{4}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\dbltopfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.92}
+\renewcommand{\dblfloatpagefraction}{0.92}
+\setlength{\textfloatsep}{4pt plus 1pt minus 1pt}
+\setlength{\dbltextfloatsep}{4pt plus 1pt minus 1pt}
+\setlength{\dblfloatsep}{4pt plus 1pt minus 1pt}
+% Reduce line overflow and suppress non critical box diagnostics in two column layout.
+\setlength{\emergencystretch}{3em}
+\tolerance=5000
+\hbadness=10000
+\vbadness=10000
+
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+\begin{document}
+
+\title{Predictive Multi Zone Reinforcement Learning Control for Battery Thermal Management}
+
+\author{Keshav Juneja$^{1}$, Mukesh Singh$^{2*}$\\
+\small $^{1}$Department of Computer Science, Thapar Institute of Engineering and Technology, Patiala, India\\
+\small $^{2}$Department of Electrical Engineering, Thapar Institute of Engineering and Technology, Patiala, India\\}
+
+\maketitle
+
+\begin{abstract}
+Battery packs in electric vehicles can accumulate heat quickly under dynamic drive conditions.
+When cooling decisions arrive late, thermal gradients widen, degradation accelerates, and safety margins shrink.
+Most existing strategies remain reactive and therefore miss the near term thermal evolution that determines these outcomes.
+We present a predictive multi zone reinforcement learning strategy for battery cooling that combines graph based spatial encoding, temporal memory, and global operating context.
+Spatial, temporal and global signals are fused into a latent representation from which the policy issues proactive valve and flow commands.
+The controller is trained with Proximal Policy Optimization (PPO) using reward terms that jointly encode safety and efficiency objectives.
+We benchmark the proposed model against a range of classical and learned (ablation) baselines across multiple regulatory drive schedules.
+Across the evaluated schedules, the proposed policy maintains temperatures within the 40\,\textdegree{}C safety threshold, reduces the maximum inter-zone temperature spread from 2.16\,\textdegree{}C to 1.07\,\textdegree{}C, and achieves significant energy savings compared to global cooling baselines.
+Overall, the results indicate that proactive predictive control is a viable and efficient route for real multi zone battery systems.
+\end{abstract}
+
+\section*{Introduction}
+
+Electrification is increasingly central to transport decarbonisation, and battery performance sits at the centre of that transition. Recent analyses continue to show the emissions advantage of electric platforms across charging scenarios~\cite{Welsby2021,Bersalli2023,LCA_EV2023}, while cost trends suggest further adoption as manufacturing scales~\cite{Link2024}. As fleet penetration grows, maintaining battery safety, reliability, and service life becomes increasingly important, making thermal management a system level challenge rather than a purely component level concern.
+
+Battery packs heat during charge discharge cycling, and that heating is rarely uniform. Under high current or adverse ambient conditions, local hot regions emerge, gradients intensify, and long term degradation accelerates; the link between thermal non uniformity and performance loss is now well documented~\cite{ThermalGradients2023,MultiscaleCoupling2022,AirQuality_EV2023}. Battery thermal management therefore has a dual burden: keep absolute temperatures within safety bounds and limit spatial dispersion so ageing does not concentrate in a few cell groups.
+
+The significance of this work lies in integration. We developed a predictive multi zone reinforcement learning architecture that couples graph based spatial encoding, recurrent temporal memory, and global operating context into a single control state. On top of that state, a PPO trained policy issues continuous commands that are explicitly anticipatory. The resulting policy reduces cooling energy while maintaining competitive peak temperature behaviour across varied drive schedules.
+
+\section*{Methods}
+
+We detail the complete thermal control architecture used for the experiments.
+Figure~\ref{figarchitecture} illustrates the full control loop executed at every time step.
+The framework contains four major components: the Environment, Inputs, Predictive Block, and the Actor Critic Module.
+
+\vspace{-0.35em}
+\begin{figure*}[!tbp]
+\centering
+\includegraphics[width=\textwidth,keepaspectratio]{iter5.png}
+\caption{Architecture of the predictive multi-zone reinforcement learning thermal management system.}\label{figarchitecture}
+\end{figure*}
+\vspace{-0.45em}
+
+\subsection*{Environment and Dynamics}
+
+The environment represents a pack with twelve independent coolant channels, regulated by proportional valves.
+Temperature evolution in each zone $j$ follows an energy conservation equation:
+\begin{equation}
+C_{b,j}\frac{dT_{b,j}}{dt} = \dot Q_{\mathrm{gen},j} - \dot Q_{\mathrm{cool},j} + \sum_{k\in\mathcal{N}(j)} k_{jk}(T_{b,k}-T_{b,j}).
+\end{equation}
+Local resistance $R_j$ drives non-uniform heating ($\dot Q_{\mathrm{gen},j} = I_{\mathrm{pack}}^2 R_j$), while valve opening $\alpha_j$ modulates the effective heat transfer coefficient $U_j = \beta_{0,j} + \beta_{1,j}\alpha_j$ for cooling.
+Lateral conduction (summation term) captures heat exchange between adjacent cell groups.
+Actuator latency and coolant transport introduce thermal delays, necessitating forward-looking control.
+
+\subsection*{Inputs and Observations}
+
+Inputs are organized into three streams providing multi-scale context:
+\begin{itemize}
+    \item \textbf{Global scalars} ($x^{\mathrm{glob}}$): Ambient temperature, vehicle speed, and HVAC status.
+    \item \textbf{Temporal history} ($x^{\mathrm{hist}}$): Mean, max, and min temperatures plus current over a window of $K=10$ samples.
+    \item \textbf{Per-zone features} ($x^{\mathrm{node}}_j$): Absolute and relative temperature, SOC, and zone voltage.
+\end{itemize}
+A graph representation encodes the physical layout, where cell groups are nodes and conductive interfaces are edges ($d_{ij}$, $k^{\mathrm{cond}}_{ij}$).
+
+\begin{table*}[!tb]
+\centering
+\caption{Controller definitions used in the final comparison. All controllers output twelve normalized zone valve commands.}\label{tab:controllers}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lllp{0.45\textwidth}}
+\hline
+\textbf{Controller} & \textbf{Family} & \textbf{Core Inputs} & \textbf{Core Idea}\\
+\hline
+PID & Classical & Max zone temp & Threshold proportional response\\
+AdaptivePID & Classical & Per-zone temp & Independent PID per zone\\
+TempProp & Classical & Per-zone temp & Proportional valve allocation\\
+UniformFlow & Classical & None & Brute force cooling reference\\
+MPC & Optimisation & Thermal state & Horizon based optimization\\
+MLP+PPO & Learned & Global state & PPO with MLP encoder\\
+LSTM+PPO & Learned & Global + temporal & PPO with temporal memory\\
+GS+PPO & Learned & Global + spatial & PPO with graph encoder\\
+GS+LSTM+PPO & Learned & Full state & Full spatial-temporal architecture\\
+\hline
+\end{tabular}
+\end{table*}
+
+\subsection*{Predictive Block}
+
+The predictive block merges inputs into a unified 448-dimensional latent state $z$.
+Scalar global features enter two MLP layers of width 64: $z_s = \phi_2(\phi_1(x^{\mathrm{glob}}))$.
+Temporal history moves through a two-layer LSTM with hidden size 256: $z_t = \mathrm{LSTM}(x^{\mathrm{hist}})$.
+Spatial structure is processed by three sequential GraphSAGE layers ($H^{(1)}, H^{(2)}, H^{(3)}$) aggregating one-hop neighbour information.
+Global pooling averages final embeddings into the spatial descriptor $z_g \in \mathbb{R}^{128}$.
+The concatenated vector $z = [z_g, z_t, z_s]$ serves as the shared input for the policy and value networks.
+
+\subsection*{Control Policy and PPO}
+
+The actor and critic networks use two fully connected layers (width 256 then 64) with ReLU activations.
+Training follows the clipped PPO algorithm using Generalized Advantage Estimation (GAE):
+\begin{equation}
+\hat A_t = \sum_{l=0}^{L-1} (\gamma\lambda_{\mathrm{GAE}})^l \delta_{t+l}, \quad \delta_t = r_t + \gamma V_{\phi}(o_{t+1}) - V_{\phi}(o_t).
+\end{equation}
+The actor outputs parameters for a diagonal Gaussian policy $\mathcal{N}(\mu, \mathrm{diag}(\sigma^2))$.
+Sampled actions are squashed into physical actuator ranges $[0, 1]$ via sigmoid functions.
+Hyperparameters and reward weights are listed in Tables~\ref{tab:ppo_hyperparameters} and \ref{tab:reward_weights}.
+
+\begin{table}[!tb]
+\centering
+\caption{PPO training hyperparameters used in the final training campaign.}\label{tab:ppo_hyperparameters}
+\small
+\begin{tabular}{ll}
+\hline
+Hyperparameter & Value\\
+\hline
+Learning rate & \(3\times10^{-4}\)\\
+Clip ratio & 0.2\\
+Entropy coeff. & 0.01\\
+GAE \(\lambda\) & 0.95\\
+Discount factor \(\gamma\) & 0.99\\
+Batch size & 6105 transitions\\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!tb]
+\centering
+\caption{Reward weights used in the final comparison.}\label{tab:reward_weights}
+\small
+\begin{tabular}{lll}
+\hline
+Term & Weight & Description\\
+\hline
+\(w_{\mathrm{safe}}\) & 5.0 & Temperature safety penalty\\
+\(w_{\mathrm{temp}}\) & 1.0 & Spatial uniformity penalty\\
+\(w_{\mathrm{energy}}\) & 0.5 & Energy efficiency penalty\\
+\(w_{\mathrm{smooth}}\) & 0.1 & Actuation smoothness penalty\\
+\hline
+\end{tabular}
+\end{table}
+
+\section*{Results}
+
+\subsection*{Energy and Temperature Tradeoff}
+
+All controllers were evaluated on six regulatory U.S. drive schedules (FTP, UDDS, HWFET, US06, SC03, LA92)~\cite{EPA_Dynamometer}.
+Figure~\ref{fig:pareto} shows the rank-space tradeoff between energy and peak temperature.
+The proposed GS+LSTM+PPO occupies a balanced central region (rank 5,5), whereas classical AdaptivePID achieves best regulation at highest cost (339.17~Wh).
+Figure~\ref{fig:bar_energy_temp} confirms that learned models maintain temperatures safely within the 40\,\textdegree{}C limit while reducing energy overhead by approximately 50\% compared to global cooling.
+Specifically, GS+LSTM+PPO restricted maximum inter-zone spread to 1.07\,\textdegree{}C, a >50\% reduction from the 2.16\,\textdegree{}C under AdaptivePID.
+The statistical distributions in Figure~\ref{fig:stats_dashboard} confirm that architectural class dominates performance variance.
+
+\vspace{-0.35em}
+\begin{figure*}[!tb]
+  \centering
+  \includegraphics[width=0.8\textwidth,keepaspectratio]{replots_from_csv/01b_pareto_alternative_tradeoff.pdf}
+  \caption{Rank space tradeoff for nine controllers (lower rank is better).}\label{fig:pareto}
+\end{figure*}
+\vspace{-0.45em}
+
+\vspace{-0.35em}
+\begin{figure*}[!tb]
+  \centering
+  \includegraphics[width=0.8\textwidth,keepaspectratio]{replots_from_csv/02_summary_comparisons.pdf}
+  \caption{Controller summary: (a) pump energy and (b) maximum pack temperature.}\label{fig:bar_energy_temp}
+\end{figure*}
+\vspace{-0.45em}
+
+\vspace{-0.35em}
+\begin{figure*}[!tb]
+  \centering
+  \includegraphics[width=\textwidth,keepaspectratio]{replots_from_csv/04_statistical_dashboard.pdf}
+  \caption{Statistical dashboard across controllers: (a) max temperature, (b) pump power, (c) spread, (d) stress, (e) overhead, and (f) correlation matrix.}\label{fig:stats_dashboard}
+\end{figure*}
+\vspace{-0.45em}
+
+\subsection*{Temporal and Spatial Analysis}
+
+The temporal dashboard (Fig.~\ref{fig:temporal_dashboard}) illustrates distinct actuation strategies.
+While all runs stay safe (panel a), PID exhibits frequent power spikes (panel d).
+MLP+PPO maintains a smoother profile, resulting in the cumulative energy gap seen in panel (c).
+Spatial field comparisons (Fig.~\ref{fig:spatial_dashboard}a) exhibit persistent thermal patterns rather than stochastic switching.
+The flow allocation heatmap (panel d) shows that whereas PID maintains near-uniform high flow, MPC and the learned policies employ structured allocation to suppress hotspots (panel c) efficiently.
+Control action behavior is further tracked in Figure~\ref{fig:control_aggressiveness}, which confirms smoother commands for predictive models.
+
+\vspace{-0.35em}
+\begin{figure*}[!tb]
+  \centering
+  \includegraphics[width=\textwidth,keepaspectratio]{replots_from_csv/03_temporal_dashboard_available_runs.pdf}
+  \caption{Temporal dashboard: (a) mean temperature, (b) spread, (c) cumulative energy, and (d) pump power.}\label{fig:temporal_dashboard}
+\end{figure*}
+\vspace{-0.45em}
+
+\vspace{-0.35em}
+\begin{figure*}[!tb]
+  \centering
+  \includegraphics[width=\textwidth,keepaspectratio]{replots_from_csv/05_spatial_dashboard_available_runs.pdf}
+  \caption{Spatial dashboard: (a) zone temperature heatmap and (d) mean flow allocation.}\label{fig:spatial_dashboard}
+\end{figure*}
+\vspace{-0.45em}
+
+\vspace{-0.35em}
+\begin{figure*}[!tb]
+  \centering
+  \includegraphics[width=\textwidth,keepaspectratio]{replots_from_csv/06_control_aggressiveness_strategy_tuned.pdf}
+  \caption{Control behavior dashboard: (a) maximum zone flow traces, (b) control spectrum, (c) smoothness metric, and (d) strategy diversity index.}\label{fig:control_aggressiveness}
+\end{figure*}
+\vspace{-0.45em}
+
+\vspace{-0.35em}
+\begin{figure*}[!tb]
+  \centering
+  \includegraphics[width=0.8\textwidth,keepaspectratio]{replots_from_csv/07_radar_top6.pdf}
+  \caption{Radar comparison across objective axes: spread, temperature, energy, and stress.}\label{fig:radar}
+\end{figure*}
+\vspace{-0.45em}
+
+\section*{Discussion}
+
+The results emphasize a nuanced tradeoff between classical and learned control.
+AdaptivePID achieves safety through high-energy global cooling (339.17~Wh), while GS+LSTM+PPO prioritizes spatial balancing (158.11~Wh) to suppress localized hotspots through anticipatory flow redistribution.
+Spatially aware allocation restricted the maximum inter-zone temperature spread to 1.07\,\textdegree{}C, a substantial reduction from the 2.16\,\textdegree{}C produced by reactive methods.
+This improved uniformity is critical for mitigating inhomogeneous degradation, where localized hotspots accelerate capacity loss, leading to premature pack failure~\cite{Iriyama2024}.
+Ultimately, reducing these spatial gradients ensures more balanced aging across cells, foundational for extending the service life of multi-zone systems~\cite{Li2023}.
+The practical value of this approach lies in the joint design of prediction and control within a single closed-loop architecture.
+
+\section*{Data and Code Availability}
+
+Raw schedules are sourced from public repositories cited in the text.
+The generated datasets and complete codebase are available at https://github.com/Keshavj-13/reserch_code~\cite{KeshavRepo2026}.
+The repository contains preprocessing scripts, electrothermal simulation notebooks, training pipelines, and plotting workflows.
+
+\begin{thebibliography}{99}
+\bibitem{Welsby2021} C. Duan and A. E. Motter, ``Grid congestion stymies climate benefit,'' \textit{Nature Communications}, vol. 16, 2025.
+\bibitem{Bersalli2023} J. Chen \textit{et al.}, ``Vehicle-to-home charging cut costs,'' \textit{Nature Energy}, vol. 10, 2025.
+\bibitem{LCA_EV2023} N. Horesh \textit{et al.}, ``Comparing costs of EV charging,'' \textit{Nature Communications}, vol. 15, 2024.
+\bibitem{AirQuality_EV2023} H. He \textit{et al.}, ``Inhomogeneous ageing in lithium-ion batteries,'' \textit{Communications Engineering}, vol. 3, 2024.
+\bibitem{Link2024} S. Link \textit{et al.}, ``Declining costs imply fast market uptake,'' \textit{Nature Energy}, vol. 9, 2024.
+\bibitem{ThermalGradients2023} S. Li \textit{et al.}, ``Effect of thermal gradients on inhomogeneous degradation,'' \textit{Communications Engineering}, vol. 2, 2023.
+\bibitem{MultiscaleCoupling2022} M. N. Marlow \textit{et al.}, ``Degradation in parallel-connected battery packs,'' \textit{Communications Engineering}, vol. 3, 2024.
+\bibitem{Huang2022} G. Huang \textit{et al.}, ``Real Time Battery Thermal Management Based on Deep RL,'' \textit{IEEE JIOT}, vol. 9, 2022.
+\bibitem{Wu2025} C. Wu \textit{et al.}, ``Thermal Management Methodology Based on Hybrid DDPG,'' \textit{IEEE TTE}, vol. 11, 2025.
+\bibitem{Cao2025} G. Cao \textit{et al.}, ``Integrated Thermal Management Methodology Based on PPO,'' \textit{IEEE Access}, vol. 13, 2025.
+\bibitem{TVT2025_RLHMPC} K. Li \textit{et al.}, ``RL-Based Hyperparameter Tuning for Adaptive MPC,'' \textit{IEEE TVT}, vol. 74, 2025.
+\bibitem{TSMC2025} Q. Ma \textit{et al.}, ``Approximate Scenario-Based MPC,'' \textit{IEEE TSMC}, vol. 55, 2025.
+\bibitem{VPPC2024_MPC} K. Li \textit{et al.}, ``Efficient MPC for EV BTMS,'' \textit{IEEE VPPC}, 2024.
+\bibitem{TVT2023_Optimal} A. Hamednia \textit{et al.}, ``Optimal Thermal Management of BEVs,'' \textit{IEEE TVT}, vol. 72, 2023.
+\bibitem{AccessILC2024} N. D. Hoa, ``Model Predictive Iterative Learning Control Design,'' \textit{IEEE Access}, vol. 12, 2024.
+\bibitem{AccessMPC2024} Y. Chen \textit{et al.}, ``Integrated Thermal Management Based on MPC,'' \textit{IEEE Access}, vol. 12, 2024.
+\bibitem{Xu2019Thermoelectric} H. J. Xu \textit{et al.}, ``Active Control Strategy for Liquid Cooling,'' \textit{Entropy}, vol. 21, 2019.
+\bibitem{EPA_Dynamometer} U.S. EPA, ``Dynamometer Drive Schedules,'' 2026. [Online].
+\bibitem{Li2023} S. Li \textit{et al.}, ``Inhomogeneous degradation,'' \textit{Communications Engineering}, 2023.
+\bibitem{Iriyama2024} T. Iriyama \textit{et al.}, ``Non-Uniform Temperature Distribution on Degradation,'' \textit{Batteries}, vol. 10, 2024.
+\bibitem{KeshavRepo2026} K. Juneja, reserch\_code repository, GitHub, 2026.
+\end{thebibliography}
+
+\end{document}

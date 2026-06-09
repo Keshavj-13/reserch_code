@@ -39,17 +39,8 @@
 \hbadness=10000
 \vbadness=10000
 
-% === Removed nonstandard / IEEE specific packages (they were in original)
-% The following were removed to follow the publisher requirement to avoid
-% nonstandard packages: mdwmath, mdwtab, eqparbox and others.
-% removed: \usepackage{mdwmath}
-% removed: \usepackage{mdwtab}
-% removed: \usepackage{eqparbox}
-
-% hyphenation line preserved (original)
 \hyphenation{op-tical net-works semi-conduc-tor}
 
-% ========== TITLE & AUTHORS ====================================================
 \begin{document}
 
 \title{Predictive Multi Zone Reinforcement Learning Control for Battery Thermal Management}
@@ -60,434 +51,205 @@
 
 \maketitle
 
-% note: replaced IEEE title machinery with standard article title block above.
-% All manuscript sentences below are preserved exactly as in your original file.
-
-% === ABSTRACT ====================================================================
 \begin{abstract}
-Battery packs in electric vehicles can accumulate heat quickly under dynamic drive conditions.
-When cooling decisions arrive late, thermal gradients widen, degradation accelerates, and safety margins shrink.
-Most existing strategies remain reactive and therefore miss the near term thermal evolution that determines these outcomes.
-We present a predictive multi zone reinforcement learning strategy for battery cooling that combines graph based spatial encoding, temporal memory, and global operating context.
-Spatial, temporal and global signals are fused into a single latent representation of forthcoming pack behaviour, from which the policy issues proactive valve and flow commands.
-The controller is trained with Proximal Policy Optimization (PPO) using reward terms that jointly encode safety and efficiency objectives.
-We benchmark against proportional control, model predictive control (MPC), and proportional integral derivative (PID) battery thermal management controllers.
-Across the evaluated drive schedules, the proposed policy lowers auxiliary cooling energy while maintaining competitive peak temperature control, improves thermal uniformity during high demand segments, and produces smoother actuation trajectories that likely reduce repeated mechanical stress on cooling hardware.
-Overall, the results indicate that practical predictive control is achievable for real multi zone battery cooling systems.
+Battery packs in electric vehicles can accumulate heat quickly under dynamic drive conditions. When cooling decisions arrive late, thermal gradients widen, degradation accelerates, and safety margins shrink. Most existing strategies remain reactive and therefore miss the near term thermal evolution that determines these outcomes. We present a predictive multi zone reinforcement learning strategy for battery cooling that combines graph based spatial encoding, temporal memory, and global operating context. Spatial, temporal and global signals are fused into a latent representation from which the policy issues proactive valve and flow commands. The controller is trained with Proximal Policy Optimization (PPO) using reward terms that jointly encode safety and efficiency objectives. We benchmark the proposed model against a range of classical and learned (ablation) baselines across multiple regulatory drive schedules. Across the evaluated schedules, the proposed policy maintains temperatures within the 40\,\textdegree{}C safety threshold, reduces the maximum inter-zone temperature spread from 2.16\,\textdegree{}C to 1.07\,\textdegree{}C, and achieves significant energy savings compared to global cooling baselines. Overall, the results indicate that proactive predictive control is a viable and efficient route for real multi zone battery systems.
 \end{abstract}
 
-
-% ====================================================================
-% ====================================================================
-% ====================================================================
-
-% === I. INTRODUCTION =============================================================
 \section*{Introduction}
 
-Electrification is increasingly central to transport decarbonisation, and battery performance sits at the centre of that transition. Recent analyses continue to show the emissions advantage of electric platforms across charging scenarios~\cite{Welsby2021,Bersalli2023,LCA_EV2023}, while cost trends suggest further adoption as manufacturing scales~\cite{Link2024}. As fleet penetration grows, maintaining battery safety, reliability, and service life becomes increasingly important, making thermal management a system level challenge rather than a purely component level concern.
+Electrification is increasingly central to transport decarbonisation, and battery performance sits at the centre of that transition. Recent analyses continue to show the emissions advantage of electric platforms across charging scenarios \cite{Welsby2021, Bersalli2023, LCA_EV2023}, while cost trends suggest further adoption as manufacturing scales \cite{Link2024}. As fleet penetration grows, maintaining battery safety, reliability, and service life becomes increasingly important, making thermal management a system level challenge rather than a purely component level concern.
 
-Battery packs heat during charge discharge cycling, and that heating is rarely uniform. Under high current or adverse ambient conditions, local hot regions emerge, gradients intensify, and long term degradation accelerates; the link between thermal non uniformity and performance loss is now well documented~\cite{ThermalGradients2023,MultiscaleCoupling2022,AirQuality_EV2023}. Battery thermal management therefore has a dual burden: keep absolute temperatures within safety bounds and limit spatial dispersion so ageing does not concentrate in a few cell groups.
+Battery packs heat during charge discharge cycling, and that heating is rarely uniform. Under high current or adverse ambient conditions, local hot regions emerge, gradients intensify, and long term degradation accelerates, the link between thermal non uniformity and performance loss is now well documented \cite{ThermalGradients2023, MultiscaleCoupling2022, AirQuality_EV2023}. Battery thermal management therefore has a dual burden, keep absolute temperatures within safety bounds and limit spatial dispersion so ageing does not concentrate in a few cell groups.
 
-Classical Battery Thermal Management Systems (BTMS) strategies still divide broadly into rule based, optimisation based, and learning based designs. Rule logic can be reliable under mild operating conditions but often struggles when load transients and spatial coupling interact~\cite{Xu2019Thermoelectric}. Optimisation methods are stronger when models are accurate, yet real time deployment remains sensitive to mismatch and computational overhead~\cite{VPPC2024_MPC,AccessILC2024,TSMC2025}. Learning based methods have improved adaptation under dynamic operation~\cite{Huang2022,TVT2025_RLHMPC}, though many reported gains come from settings where either spatial detail or forward thermal reasoning is limited.
+Classical Battery Thermal Management Systems (BTMS) strategies still divide broadly into rule based, optimisation based, and learning based designs. Rule logic can be reliable under mild operating conditions but often struggles when load transients and spatial coupling interact \cite{Xu2019Thermoelectric}. Optimisation methods are stronger when models are accurate, yet real time deployment remains sensitive to mismatch and computational overhead \cite{VPPC2024_MPC, AccessILC2024, TSMC2025}. Learning based methods have improved adaptation under dynamic operation \cite{Huang2022, TVT2025_RLHMPC}, though many reported gains come from settings where either spatial detail or forward thermal reasoning is limited.
 
-The modelling landscape has matured in parallel. Analytical and reduced order models remain computationally attractive, data driven models capture complex patterns from large operational records, and hybrid variants attempt to combine both. Comparative studies now span convolutional, graph, and physics informed learning architectures~\cite{AccessMPC2024,AccessILC2024,TSMC2025}. Even so, physically faithful and operationally interpretable prediction at pack scale is still difficult, especially when control decisions must be produced in real time.
+The modelling landscape has matured in parallel. Analytical and reduced order models remain computationally attractive, data driven models capture complex patterns from large operational records, and hybrid variants attempt to combine both. Comparative studies now span convolutional, graph, and physics informed learning architectures \cite{AccessMPC2024, AccessILC2024, TSMC2025}. Even so, physically faithful and operationally interpretable prediction at pack scale is still difficult, especially when control decisions must be produced in real time.
 
-Recent AI based control studies report meaningful improvements: neural PID combinations have reduced coolant energy demand~\cite{11017253,AccessILC2024}, deterministic policy gradient variants improved regulation~\cite{Wu2025}, and actor critic or attention based formulations reduced thermal violations in demanding scenarios~\cite{Cao2025,TVT2025_RLHMPC}. Yet a common limitation persists. Most policies remain predominantly reactive.
+Recent AI based control studies report meaningful improvements, neural PID combinations have reduced coolant energy demand \cite{11017253, AccessILC2024}, deterministic policy gradient variants improved regulation \cite{Wu2025}, and actor critic or attention based formulations reduced thermal violations in demanding scenarios \cite{Cao2025, TVT2025_RLHMPC}. Yet a common limitation persists. Most policies remain predominantly reactive.
 
-That matters because thermal dynamics are delayed and spatially coupled. Once hotspot growth is clearly visible in measured temperatures, a substantial part of the damage trajectory may already be underway. Prior memory augmented RL methods improve temporal context but do not consistently preserve zone level spatial information~\cite{Huang2022}; hierarchical and attention based approaches can improve aggregate metrics, yet often rely on averaged pack signals that blur local behaviour~\cite{Wu2025,Cao2025}. Existing hybrid RL designs likewise report mixed evidence of truly anticipatory operation~\cite{TVT2023_Optimal,AccessMPC2024}.
+That matters because thermal dynamics are delayed and spatially coupled. Once hotspot growth is clearly visible in measured temperatures, a substantial part of the damage trajectory may already be underway. Prior memory augmented RL methods improve temporal context but do not consistently preserve zone level spatial information \cite{Huang2022}, hierarchical and attention based approaches can improve aggregate metrics, yet often rely on averaged pack signals that blur local behaviour \cite{Wu2025, Cao2025}. Existing hybrid RL designs likewise report mixed evidence of truly anticipatory operation \cite{TVT2023_Optimal, AccessMPC2024}.
 
-Our reading of this gap is straightforward: prediction and control are usually treated as adjacent modules rather than one jointly learned decision process. We therefore develop a predictive multi zone reinforcement learning architecture that couples graph based spatial encoding, recurrent temporal memory, and global operating context into a single control state. On top of that state, a PPO trained policy issues continuous valve, pump, and fan commands that are explicitly anticipatory rather than threshold triggered.
+Our reading of this gap is straightforward, prediction and control are usually treated as adjacent modules rather than one jointly learned decision process. We therefore develop a predictive multi zone reinforcement learning architecture that couples graph based spatial encoding, recurrent temporal memory, and global operating context into a single control state. On top of that state, a PPO trained policy issues continuous valve, pump, and fan commands that are explicitly anticipatory rather than threshold triggered.
 
 The significance of this work lies in integration. We found that combining spatial coupling, temporal evolution, and control optimisation in one end to end pipeline yields a compact predictive state that is expressive enough for zone level coordination but still efficient for real time use. The resulting policy reduces auxiliary cooling energy while maintaining competitive peak temperature behaviour across varied drive schedules, and the control trajectories are smoother, which may lower actuator fatigue over long operation windows.
 
 Equally important, the architecture is practical to evaluate and extend. By embedding prediction directly inside the policy loop and retaining physically meaningful action constraints, the approach provides a deployable route toward anticipatory pack conditioning in large multi zone battery systems.
 
-%
+To evaluate this strategy, we developed a multi zone simulation environment and an integrated reinforcement learning pipeline, detailed in the following sections.
+
 \section*{Methods}
 
-We detail the complete thermal control architecture used for the experiments.
-Figure~\ref{figarchitecture} illustrates the full control loop executed at every time step.
-The loop begins when sensor measurements arrive from the battery pack and surroundings.
-These measurements are organised into spatial, temporal, and global input streams.
-A predictive block processes these streams and estimates future thermal behaviour across zones.
-This prediction captures heat propagation and delayed thermal responses under dynamic load.
-An actor critic controller then computes continuous cooling actions from the predicted state.
-These actions regulate valve positions, coolant flow rate, and fan speed each interval.
-The applied actions influence zone temperature evolution during the subsequent control step.
-Updated measurements return to the controller, completing the feedback loop at each step.
-This repeated interaction enables coordinated and anticipatory cooling across all zones.
-The framework contains four major components that operate in sequence at each step.
-These components are the Environment, Inputs, Predictive Block, and the Actor Critic Module.
-Each component is described in full detail within its dedicated subsection below.
-The complete implementation pipeline is available in our public repository~\cite{KeshavRepo2026}.
+We detail the complete thermal control architecture used for the experiments. Figure 1 illustrates the full control loop executed at every time step. The loop begins when sensor measurements arrive from the battery pack and surroundings, which are organised into spatial, temporal, and global input streams. A predictive block processes these streams and estimates future thermal behaviour across zones, capturing heat propagation and delayed thermal responses under dynamic load. An actor critic controller then computes continuous cooling actions, regulating valve positions, coolant flow rate, and fan speed, from the predicted state.
+
+The framework contains four major components that operate in sequence, the Environment, Inputs, Predictive Block, and the Actor Critic Module. Each component is described in full detail in the following subsections. The complete implementation pipeline is available in our public repository \cite{KeshavRepo2026}.
 
 \subsection*{Dataset generation and preprocessing}
 
-The dataset uses regulatory schedules published by United States environmental agencies~\cite{EPA_Dynamometer}.
-These schedules cover city traffic, highway cruising, aggressive demand, and cabin cooling.
-We selected every schedule file except the merged composite file in the folder.
-The retained schedules are FTP, UDDS, HWFET, US06, SC03, and LA92 traces.
-Each schedule contributes distinct acceleration patterns, stop frequencies, and sustained speed intervals.
-City traces emphasize frequent stop and restart events across the full evaluation window.
-Highway traces carry steady speed segments and longer thermal accumulation intervals between events.
-Aggressive traces raise current peaks and expose stronger resistive heating conditions throughout.
-Air conditioning traces add auxiliary thermal demand during warmer ambient operation segments.
-The US06 schedule produces the highest instantaneous current peaks among all retained cycles.
-SC03 applies simultaneous air conditioning load at an ambient temperature of 35 degrees Celsius.
-LA92 combines aggressive acceleration bursts with moderate cruise intervals across the trajectory.
-Taken jointly, these six schedules provide broad thermal loading coverage for controller evaluation.
-The preprocessing pipeline parsed synchronized time and speed records for use in simulation.
-Malformed rows were removed and timestamp inconsistencies were corrected using linear interpolation before resampling.
-All traces were aligned to a fixed sampling interval for comparable trajectory lengths.
-Vehicle dynamics converted speed profiles into propulsion power and pack current demand values.
-The conversion used a 2200~kg vehicle mass, aerodynamic drag \(0.5\rho C_d A v^2\) with \(\rho=1.225~\mathrm{kg\,m^{-3}}\), \(C_d=0.24\), frontal area \(A=2.34~\mathrm{m^2}\), rolling resistance coefficient 0.008, drivetrain efficiency 0.92 during traction, and regenerative efficiency 0.60 during braking.
-Pack current was computed by dividing electrical power by the 44.4~V nominal pack voltage and clipping the result to the admissible pack current range.
-Derived current values were clipped within the realistic operating limits of the pack.
-Feature windows extracted fixed length observation histories from the continuous sensor traces for all methods.
-Chronological partitions separated training, validation, and testing subsets without temporal leakage.
-Preprocessing parameters and schedule identifiers were recorded to support evaluation reconstruction.
-The scripts for this pipeline are included in the repository~\cite{KeshavRepo2026}.
+The dataset uses regulatory schedules published by United States environmental agencies \cite{EPA_Dynamometer}. These schedules cover city traffic, highway cruising, aggressive demand, and cabin cooling. We selected every schedule file except the merged composite file in the folder. The retained schedules are FTP, UDDS, HWFET, US06, SC03, and LA92 traces. Each schedule contributes distinct acceleration patterns, stop frequencies, and sustained speed intervals. City traces emphasize frequent stop and restart events across the full evaluation window. Highway traces carry steady speed segments and longer thermal accumulation intervals between events. Aggressive traces raise current peaks and expose stronger resistive heating conditions throughout. Air conditioning traces add auxiliary thermal demand during warmer ambient operation segments. The US06 schedule produces the highest instantaneous current peaks among all retained cycles. SC03 applies simultaneous air conditioning load at an ambient temperature of 35 degrees Celsius. LA92 combines aggressive acceleration bursts with moderate cruise intervals across the trajectory. Taken jointly, these six schedules provide broad thermal loading coverage for controller evaluation. The preprocessing pipeline parsed synchronized time and speed records for use in simulation. Malformed rows were removed and timestamp inconsistencies were corrected using linear interpolation before resampling. All traces were aligned to a fixed sampling interval for comparable trajectory lengths. Vehicle dynamics converted speed profiles into propulsion power and pack current demand values. The conversion used a 2200 kg vehicle mass, aerodynamic drag $0.5\rho C_d A v^2$ with $\rho = 1.225~\mathrm{kg\,m^{-3}}$, $C_d = 0.24$, frontal area $A = 2.34~\mathrm{m^2}$, rolling resistance coefficient 0.008, drivetrain efficiency 0.92 during traction, and regenerative efficiency 0.60 during braking. Pack current was computed by dividing electrical power by the 44.4 V nominal pack voltage and clipping the result to the admissible pack current range. Derived current values were clipped within the realistic operating limits of the pack. Feature windows extracted fixed length observation histories from the continuous sensor traces for all methods. Chronological partitions separated training, validation, and testing subsets without temporal leakage. Preprocessing parameters and schedule identifiers were recorded to support evaluation reconstruction. The scripts for this pipeline are included in the repository \cite{KeshavRepo2026}.
 
-\vspace{-0.35em}
 \begin{figure*}[!tbp]
 \centering
 \includegraphics[width=\textwidth,keepaspectratio]{iter5.png}
 \caption{Architecture of the reinforcement learning battery thermal management system with predictive encoding, multi zone perception, actor critic control, and proactive energy efficient temperature regulation.}\label{figarchitecture}
 \end{figure*}
-\vspace{-0.45em}
 
 \subsection*{Environment}
 
-The environment in Figure~\ref{figarchitecture} forms the outer boundary of the control loop.
-It represents an electric vehicle battery pack containing multiple independent coolant channels.
-Each coolant channel contains a proportional valve that meters the local flow distribution.
-A single pump drives total coolant circulation through the pack's full thermal network.
-A radiator fan provides convective heat rejection at the pack's external heat exchanger.
-The three actuator classes therefore define a three degree of freedom thermal regulation system.
-Temperature sensors, voltage monitors, and current transducers produce continuous pack measurements.
-These measurements propagate to the controller at every discrete control time step reliably.
+The environment in Figure 1 forms the outer boundary of the control loop. It represents an electric vehicle battery pack containing multiple independent coolant channels. Each coolant channel contains a proportional valve that meters the local flow distribution. A single pump drives total coolant circulation through the pack's full thermal network. A radiator fan provides convective heat rejection at the pack's external heat exchanger. The three actuator classes therefore define a three degree of freedom thermal regulation system. Temperature sensors, voltage monitors, and current transducers produce continuous pack measurements. These measurements propagate to the controller at every discrete control time step reliably.
 
-The simulator produces spatially resolved heat generation models for the entire pack.
-Ohmic heating varies across zones because local cell resistance differs between positions.
-Coolant transport introduces thermal delays that persist across several consecutive control intervals.
-Actuator latency also appears in the simulation, delaying the visible effect of commands.
-The controller must therefore anticipate future thermal states rather than react to present ones.
-This transport and latency structure is the primary motivation for adopting a predictive architecture.
-Without prediction, a reactive controller would consistently lag behind the evolving thermal state.
+The simulator produces spatially resolved heat generation models for the entire pack. Ohmic heating varies across zones because local cell resistance differs between positions. Coolant transport introduces thermal delays that persist across several consecutive control intervals. Actuator latency also appears in the simulation, delaying the visible effect of commands. The controller must therefore anticipate future thermal states rather than react to present ones. This transport and latency structure is the primary motivation for adopting a predictive architecture. Without prediction, a reactive controller would consistently lag behind the evolving thermal state.
 
-Training proceeds entirely within this simulated environment before any real evaluation begins.
-The simulation uses electrothermal dynamics calibrated against representative lithium ion cell parameters.
-Six drive cycle schedules supply distinct current profiles across different training episodes.
-Each episode initialises from a randomised uniform pack temperature between 25\,\textdegree{}C and 35\,\textdegree{}C.
-Randomised initialisation prevents the policy from overfitting to a single thermal trajectory.
-Episode termination occurs at the schedule end or upon a safety limit violation event.
-Safety violations trigger early termination and apply a large negative terminal reward signal.
-This termination structure forces the policy to treat overtemperature events as catastrophic failures.
+Training proceeds entirely within this simulated environment before any real evaluation begins. The simulation uses electrothermal dynamics calibrated against representative lithium ion cell parameters. Six drive cycle schedules supply distinct current profiles across different training episodes. Each episode initialises from a randomised uniform pack temperature between 25 °C and 35 °C. Randomised initialisation prevents the policy from overfitting to a single thermal trajectory. Episode termination occurs at the schedule end or upon a safety limit violation event. Safety violations trigger early termination and apply a large negative terminal reward signal. This termination structure forces the policy to treat overtemperature events as catastrophic failures.
 
-The environment exposes fully continuous action and observation spaces to the learning agent.
-Observation dimension scales linearly with zone count and the temporal history window length.
-Action dimension equals the number of independent zone valve channels.
-Aggregate pump power is reconstructed from the mean valve opening for energy accounting.
-All actuator outputs are projected into physically admissible ranges by differentiable squashing functions.
-This projection constrains sampled actions to physically admissible hardware commands.
-The simulator records every state transition for offline analysis and reproducibility verification.
-This logging enables detailed post training inspection of energy, temperature, and control behaviour.
-Complete records support fair and transparent comparison across all nine evaluated controllers.
+The environment exposes fully continuous action and observation spaces to the learning agent. Observation dimension scales linearly with zone count and the temporal history window length. Action dimension equals the number of independent zone valve channels. Aggregate pump power is reconstructed from the mean valve opening for energy accounting. All actuator outputs are projected into physically admissible ranges by differentiable squashing functions. This projection constrains sampled actions to physically admissible hardware commands. The simulator records every state transition for offline analysis and reproducibility verification. This logging enables detailed post training inspection of energy, temperature, and control behaviour. Complete records support fair and transparent comparison across all nine evaluated controllers.
 
 \subsection*{Inputs}
 
-The three input groups in Figure~\ref{figarchitecture} supply multi scale context to the encoders.
-These groups address global operating conditions, recent temporal history, and local zone state.
-Separating these three scales allows each encoder branch to specialise on relevant information.
-Mixing them into a single flat vector would obscure the distinct structure of each scale.
+The input data are organised into three distinct streams to provide multi-scale context to the encoders:
+\begin{itemize}
+    \item \textbf{Global scalars}: ambient temperature, vehicle speed, and HVAC status.
+    \item \textbf{Temporal history}: short-term temperature and current trends over a window of $K=10$ samples.
+    \item \textbf{Per-zone features}: spatially resolved measurements (temperature, SOC, voltage) for individual cell groups.
+\end{itemize}
 
-Global scalars supply ambient temperature, vehicle speed, and HVAC activity status each step.
-These three values describe the broad thermal environment that surrounds the battery pack.
-Ambient temperature sets the baseline heat rejection capacity available at the radiator surface.
-Higher ambient conditions reduce the temperature driving force and limit convective cooling capacity.
-Vehicle speed modulates convective airflow across external pack surfaces during driving operation.
-HVAC activity indicates whether the compressor is providing refrigerant assisted cabin cooling.
-Collectively, these three scalars capture the dominant external influences on pack thermal behaviour.
+Global scalars describe the broad thermal environment surrounding the pack. Ambient temperature sets the baseline heat rejection capacity, while vehicle speed modulates convective airflow across radiator surfaces. HVAC activity indicates additional refrigerant assisted cooling demand.
 
-Short term temperature and current histories track recent evolution over a fixed window length.
-Through this history, the controller perceives rising thermal trends before they reach peaks.
-Window length is fixed at \(K=10\) recent samples, selected through cross validation on the training drive cycle set.
-Each history entry includes mean, maximum, and minimum temperatures across all pack zones.
-Pack current history reflects the load profile that has been driving heat generation recently.
-The temporal stream lets the LSTM encoder track accumulated thermal momentum in the pack.
-Thermal momentum describes how heat builds when current exceeds the momentary cooling capacity.
-Without history, the controller would respond only to instantaneous measurements at each step.
+Short term histories allow the controller to perceive rising thermal trends before they reach peaks. This temporal stream lets the LSTM encoder track accumulated thermal momentum, reflecting how heat builds when current exceeds momentary cooling capacity. Without this history, the controller would respond only to instantaneous measurements.
 
-Per zone features then provide spatially resolved information about individual cell groups directly.
-Each zone contributes its absolute temperature, deviation from pack mean, state of charge, and voltage.
-Pack current appears again at the zone level because it applies uniformly across all zones.
-A zone index feature encodes each zone's relative position within the pack topology graph.
-This positional encoding helps the spatial encoder learn position dependent thermal loading patterns.
-Zones near the pack centre typically retain heat longer than edge zones due to reduced convection.
-The three part input design links global conditions, temporal trends, and local state together.
-This linkage provides the predictive block with both pack wide and zone specific information for thermal forecasting.
-Uneven heating across zones becomes directly observable through the per zone feature vectors.
-Modular input organisation also supports ablation studies that isolate each branch's contribution.
-Removing the graph input while keeping the temporal and global branches produces the LSTM+PPO variant.
-This ablation quantifies the specific contribution of spatial encoding to overall controller performance.
+Per zone features then provide spatially resolved information. Each zone contributes its absolute temperature, deviation from pack mean, state of charge, and voltage. A zone index feature encodes each zone's relative position within the pack topology graph, helping the spatial encoder learn position dependent patterns. Zones near the pack centre typically retain heat longer than edge zones due to reduced convection. Modular input organisation also supports ablation studies (e.g., LSTM+PPO) that isolate the specific contribution of spatial encoding.
 
 \begin{table*}[!tb]
 \centering
-\caption{Controller definitions used in the final comparison. All controllers output twelve normalized zone valve commands; energy accounting converts the mean valve opening into pump power.}\label{tab:controllers}
-\begin{tabular}{p{0.12\textwidth}p{0.12\textwidth}p{0.16\textwidth}p{0.12\textwidth}p{0.24\textwidth}p{0.16\textwidth}}
+\caption{Controller definitions used in the final comparison. All controllers output twelve normalized zone valve commands.}\label{tab:controllers}
+\small
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{llll}
 \hline
-Controller & Family & Inputs & Outputs & Control law or architecture & Key difference from PID\\
+Controller & Family & Core Inputs & Core Idea\\
 \hline
-PID & Classical & Maximum zone temperature & Zone valve vector & Thresholded proportional integral derivative baseline & Uses uniform threshold response\\
-AdaptivePID & Classical & Per zone temperature & Zone valve vector & Independent PID loop per zone & Adapts valve command locally\\
-TempProp & Classical & Per zone temperature & Zone valve vector & Valve command proportional to local temperature rise & No integral or derivative state\\
-UniformFlow & Classical & None beyond schedule state & Zone valve vector & All zone valves held fully open & Brute force cooling reference\\
-MPC & Optimisation & Current thermal state & Zone valve vector & Random shooting horizon proxy over candidate actions & Optimises prospective action candidates\\
-MLP+PPO & Learned & Global state only & Zone valve vector & PPO actor critic with MLP context encoder & No spatial graph or recurrent memory\\
-LSTM+PPO & Learned & Temporal and global state & Zone valve vector & PPO actor critic with recurrent temporal encoder & Adds memory but removes spatial graph\\
-GS+PPO & Learned & Spatial and global state & Zone valve vector & PPO actor critic with GraphSAGE encoder & Adds spatial graph but removes memory\\
-GS+LSTM+PPO & Learned & Spatial, temporal, and global state & Zone valve vector & PPO actor critic with GraphSAGE, LSTM, and MLP encoders & Fuses spatial reasoning with temporal memory\\
+PID & Classical & Max zone temperature & Threshold proportional response\\
+AdaptivePID & Classical & Per zone temperature & Independent PID per zone\\
+TempProp & Classical & Per zone temperature & Proportional valve allocation\\
+UniformFlow & Classical & None & Brute force cooling reference\\
+MPC & Optimisation & Current thermal state & Horizon based optimization\\
+MLP+PPO & Learned & Global state only & PPO with MLP encoder\\
+LSTM+PPO & Learned & Global + temporal & PPO with temporal memory\\
+GS+PPO & Learned & Global + spatial & PPO with graph encoder\\
+GS+LSTM+PPO & Learned & Global + temporal + spatial & Full architecture\\
 \hline
 \end{tabular}
 \end{table*}
 
 \subsection*{Predictive Block}
 
-The predictive block in Figure~\ref{figarchitecture} merges all input streams into one unified state.
-This latent state summarises the estimated future thermal condition of the battery pack.
-Three specialised encoder branches process the spatial, temporal, and global inputs independently.
-Their outputs are concatenated into a single unified predictive representation for the controller.
+The predictive block in Figure 1 merges all input streams into one unified state. This latent state summarises the estimated future thermal condition of the battery pack. Three specialised encoder branches process the spatial, temporal, and global inputs independently. Their outputs are concatenated into a single unified predictive representation for the controller.
 
-Scalar global features enter two sequential MLP layers of width 64 each in this branch.
-Width 64 provides sufficient representational capacity within tight computational resource constraints.
-Batch normalisation between layers stabilises training under varying input magnitude ranges.
-The resulting embedding captures the influence of external operating conditions on pack cooling.
-Early testing showed that increasing width beyond 64 produced negligible performance improvement.
-This finding justified keeping the global branch compact relative to the other two encoders.
+Scalar global features enter two sequential MLP layers of width 64 each in this branch. Width 64 provides sufficient representational capacity within tight computational resource constraints. Batch normalisation between layers stabilises training under varying input magnitude ranges. The resulting embedding captures the influence of external operating conditions on pack cooling. Early testing showed that increasing width beyond 64 produced negligible performance improvement. This finding justified keeping the global branch compact relative to the other two encoders.
 
-Temporal information moves through a two layer LSTM with hidden size 256 and dropout 0.1.
-The LSTM learns to compress the recent measurement history into a dense dynamic summary.
-This summary captures delayed heating and cooling responses that evolve over short time windows.
-Recurrent memory allows the encoder to track multi step thermal accumulation within each episode.
-Patterns of sustained high current followed by temperature lag would be invisible without this memory.
-Dropout of rate 0.1 between the two LSTM layers reduces overfitting to training sequences.
-The hidden state from the final LSTM layer is passed downstream to the fusion step.
-Hidden size 256 was selected as a balance between expressiveness and training stability requirements.
+Temporal information moves through a two layer LSTM with hidden size 256 and dropout 0.1. The LSTM learns to compress the recent measurement history into a dense dynamic summary. This summary captures delayed heating and cooling responses that evolve over short time windows. Recurrent memory allows the encoder to track multi step thermal accumulation within each episode. Patterns of sustained high current followed by temperature lag would be invisible without this memory. Dropout of rate 0.1 between the two LSTM layers reduces overfitting to training sequences. The hidden state from the final LSTM layer is passed downstream to the fusion step. Hidden size 256 was selected as a balance between expressiveness and training stability requirements.
 
-Spatial structure enters three sequential GraphSAGE layers with 128 dimensional node embeddings throughout.
-Each GraphSAGE layer aggregates information from one hop neighbours in the pack connectivity graph.
-Stacking three layers expands the effective receptive field to cover three hop topology depth.
-Three hops is sufficient to capture heat propagation across the full twelve zone pack layout.
-A global pooling layer then compresses all final node embeddings into one fixed size descriptor.
-This descriptor has 128 dimensions and summarises the full spatial thermal state of the pack.
-The pooling output has fixed size regardless of how many zones the pack contains.
-As a result, the spatial encoder scales directly to larger or smaller pack configurations.
+Spatial structure enters three sequential GraphSAGE layers with 128 dimensional node embeddings throughout. Each GraphSAGE layer aggregates information from one hop neighbours in the pack connectivity graph. Stacking three layers expands the effective receptive field to cover three hop topology depth. Three hops is sufficient to capture heat propagation across the full twelve zone pack layout. A global pooling layer then compresses all final node embeddings into one fixed size descriptor. This descriptor has 128 dimensions and summarises the full spatial thermal state of the pack. The pooling output has fixed size regardless of how many zones the pack contains. As a result, the spatial encoder scales directly to larger or smaller pack configurations.
 
-The three embeddings are concatenated to form the latent control state.
-The global branch contributes 64 dimensions, temporal contributes 256, and spatial contributes 128.
-The resulting fused vector has 448 dimensions and carries all scale specific encoded information.
-This 448 dimensional state serves as the shared input to both actor and critic networks.
-All three encoder branches train jointly with the actor critic through PPO gradient updates.
-End to end training aligns encoder representations with the downstream thermal control objective.
-Gradients flow backward through each branch simultaneously, shaping their learned feature spaces.
+The three embeddings are concatenated to form the latent control state. The global branch contributes 64 dimensions, temporal contributes 256, and spatial contributes 128. The resulting fused vector has 448 dimensions and carries all scale specific encoded information. This 448 dimensional state serves as the shared input to both actor and critic networks. All three encoder branches train jointly with the actor critic through PPO gradient updates. End to end training aligns encoder representations with the downstream thermal control objective. Gradients flow backward through each branch simultaneously, shaping their learned feature spaces.
 
 \subsection*{Actor and Critic Networks with PPO}
 
-The fused predictive state flows into two parallel network branches at each control step.
-The actor branch produces continuous cooling commands for all actuators in the system.
-The critic branch estimates the expected cumulative discounted reward from the current state.
-Both branches receive the same 448 dimensional fused state as their common input.
+The fused predictive state flows into two parallel network branches at each control step. The actor branch produces continuous cooling commands for all actuators in the system. The critic branch estimates the expected cumulative discounted reward from the current state. Both branches receive the same 448 dimensional fused state as their common input.
 
-The critic passes the fused state through two fully connected layers of width 256 then 64.
-Both layers use ReLU activations to introduce the nonlinearity needed for value estimation.
-A final linear projection from width 64 produces a single scalar value estimate for training.
-This scalar is compared against observed returns to produce the advantage signal during updates.
+The critic passes the fused state through two fully connected layers of width 256 then 64. Both layers use ReLU activations to introduce the nonlinearity needed for value estimation. A final linear projection from width 64 produces a single scalar value estimate for training. This scalar is compared against observed returns to produce the advantage signal during updates.
 
-The actor branch mirrors the critic architecture, using two layers of the same widths.
-Its final projection produces a mean vector covering all actuator command dimensions simultaneously.
-A separate learned log standard deviation parameter vector defines the spread of each action dimension.
-Together, the mean and log standard deviation parameterise a diagonal Gaussian action distribution.
-Actions are sampled from this distribution during training to maintain exploratory stochasticity.
-During evaluation, the mean vector is used directly as the deterministic control command output.
+The actor branch mirrors the critic architecture, using two layers of the same widths. Its final projection produces a mean vector covering all actuator command dimensions simultaneously. A separate learned log standard deviation parameter vector defines the spread of each action dimension. Together, the mean and log standard deviation parameterise a diagonal Gaussian action distribution. Actions are sampled from this distribution during training to maintain exploratory stochasticity. During evaluation, the mean vector is used directly as the deterministic optimal control command output.
 
-Training follows the clipped Proximal Policy Optimisation algorithm for stable iterative improvement.
-PPO prevents large policy shifts by clipping the probability ratio between consecutive iterations.
-This clipping mechanism preserves stability even when reward landscapes are non stationary.
-Fixed length rollouts are collected from the simulated environment before each gradient update batch.
-Generalised advantage estimation combines observed rewards with critic predictions for advantage computation.
-Multiple gradient steps are applied per rollout batch before any new experience is collected.
-Early stopping based on approximate KL divergence prevents excessive updates within a single batch.
-Hyperparameters including clip ratio, learning rate, and entropy coefficient were tuned empirically.
-The entropy coefficient encourages sufficient action space exploration during early training stages.
-Annealing the entropy coefficient over training time transitions the policy toward deterministic behaviour.
-Adam optimiser updates both actor and critic parameters jointly at every gradient step.
-Gradient clipping prevents exploding gradients during backpropagation through the recurrent LSTM encoder.
+Training follows the clipped Proximal Policy Optimisation algorithm for stable iterative improvement. PPO prevents large policy shifts by clipping the probability ratio between consecutive iterations. This clipping mechanism preserves stability even when reward landscapes are non stationary. Fixed length rollouts are collected from the simulated environment before each gradient update batch. Generalised advantage estimation combines observed rewards with critic predictions for advantage computation. Multiple gradient steps are applied per rollout batch before any new experience is collected. Early stopping based on approximate KL divergence prevents excessive updates within a single batch. Hyperparameters including clip ratio, learning rate, and entropy coefficient were tuned empirically. The entropy coefficient encourages sufficient action space exploration during early training stages. Annealing the entropy coefficient over training time transitions the policy toward deterministic behaviour. Adam optimiser updates both actor and critic parameters jointly at every gradient step. Gradient clipping prevents exploding gradients during backpropagation through the recurrent LSTM encoder.
 
 \subsection*{Reward Function}
 
-The reward function encodes four competing objectives that define good thermal control behaviour.
-These objectives are safety enforcement, temperature uniformity, energy efficiency, and actuation smoothness.
-Each objective contributes an independent additive term that is individually weighted each step.
-The weight configuration determines the trained policy's position along the tradeoff surface.
-
-Safety penalties activate whenever any zone temperature exits its permitted operating range directly.
-These penalties carry large coefficients that dominate the total reward near limit violations.
-Dominance forces the policy to treat temperature safety as its highest priority constraint throughout.
-Uniformity penalties reduce variance between zone temperatures across the full pack each step.
-High variance indicates localised hot spots that the policy must redistribute flow to address.
-Energy penalties directly measure auxiliary power consumed by pump and fan actuators each step.
-It penalises full power cooling during intervals of low thermal demand.
-Smoothness penalties penalise large actuator command changes between consecutive control steps.
-These penalties reduce mechanical wear on pump valves and fan motor bearing surfaces.
-Oscillatory control behaviour that reduces net cooling efficiency is also discouraged by this term.
-
-The implemented recovered training branch uses fixed reward weights throughout each training run.
-These fixed weights were selected to keep safety and spatial uniformity dominant while retaining penalties for energy use and abrupt valve changes.
-The chosen weights balance safety, efficiency, uniformity, and smoothness outcomes in the recovered comparison campaign.
+The reward function encodes four competing objectives: safety enforcement, temperature uniformity, energy efficiency, and actuation smoothness. The weight configuration determines the trained policy's position along the tradeoff surface. The final comparison campaign uses fixed reward weights as listed in Table 2.
 
 \begin{table}[!tb]
 \centering
-\caption{Reward weights used in the recovered training branch. Values are taken from `tags/recovered_physics_v1/core_physics_v1.py`.}\label{tab:reward_weights}
-\begin{tabular}{lll}
+\caption{Reward weights used in the final comparison.}\label{tab:reward_weights}
+\small
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{llp{0.55\linewidth}}
 \hline
 Term & Weight & Source component\\
 \hline
-\(w_{\mathrm{safe}}\) & 5.0 & Over/under temperature penalty\\
-\(w_{\mathrm{temp}}\) & 1.0 & Spatial standard deviation penalty\\
-\(w_{\mathrm{energy}}\) & 0.5 & Mean valve opening penalty\\
-\(w_{\mathrm{smooth}}\) & 0.1 & Squared valve change penalty\\
-\(\lambda\) terms & Folded into fixed weights & No separate runtime schedule\\
+$w_{\mathrm{safe}}$ & 5.0 & Over/under temperature penalty\\
+$w_{\mathrm{temp}}$ & 1.0 & Spatial standard deviation penalty\\
+$w_{\mathrm{energy}}$ & 0.5 & Mean valve opening penalty\\
+$w_{\mathrm{smooth}}$ & 0.1 & Squared valve change penalty\\
 \hline
 \end{tabular}
 \end{table}
 
 \subsection*{Overall Operation}
 
-The closed loop behaviour in Figure~\ref{figarchitecture} unites all previous components each step.
-At the start of each interval, fresh observations arrive from all pack sensor channels.
-The observations are formatted into the three input groups described in the Inputs subsection.
-The predictive block processes all three groups and produces the 448 dimensional fused state.
-The actor network receives this state and either samples or returns the mean action vector.
-The action vector is squashed into physically admissible ranges before being applied to actuators.
-Valve positions, pump speed, and fan speed adjust simultaneously according to the action vector.
-The simulated environment advances one time step and returns updated zone temperature measurements.
-Updated measurements initiate the next iteration of the same closed loop sequence immediately.
+The closed loop behaviour in Figure 1 unites all previous components each step. At the start of each interval, fresh observations arrive from all pack sensor channels. The observations are formatted into the three input groups described in the Inputs subsection. The predictive block processes all three groups and produces the 448 dimensional fused state. The actor network receives this state and either samples or returns the mean action vector. The action vector is squashed into physically admissible ranges before being applied to actuators. Valve positions, pump speed, and fan speed adjust simultaneously according to the action vector. The simulated environment advances one time step and returns updated zone temperature measurements. Updated measurements initiate the next iteration of the same closed loop sequence immediately.
 
-The critic network operates in parallel during training to guide policy gradient computation.
-It receives the same fused state as the actor and outputs a scalar return estimate.
-This estimate is compared against observed discounted returns after completing each rollout.
-The resulting advantage signal is used in the PPO clipped objective for actor updates.
-Frequent small PPO update steps maintain stable improvement throughout the full training process.
-Value function and entropy objectives supplement the policy gradient to regularise learning.
+The critic network operates in parallel during training to guide policy gradient computation. It receives the same fused state as the actor and outputs a scalar return estimate. This estimate is compared against observed discounted returns after completing each rollout. The resulting advantage signal is used in the PPO clipped objective for actor updates. Frequent small PPO update steps maintain stable improvement throughout the full training process. Value function and entropy objectives supplement the policy gradient to regularise learning.
 
-The controller executes at a fixed discrete frequency matched to the drive cycle sampling rate.
-At this frequency, thermal dynamics remain well resolved between successive control decisions.
-Actuator commands persist at their commanded values between control steps during evaluation.
-Piecewise constant inputs simplify the numerical integration of the thermal dynamics model.
-The spatial encoder scales naturally to packs with more zones by extending the graph.
-Adding zones increases node count in the GraphSAGE encoder without changing any architecture.
-No structural modifications to the actor or critic networks are required for scaling.
-This architectural scalability makes the framework broadly applicable across different pack sizes.
-Evaluation across all six drive cycles confirms performance generalisation without retraining.
+The controller executes at a fixed discrete frequency matched to the drive cycle sampling rate. At this frequency, thermal dynamics remain well resolved between successive control decisions. Actuator commands persist at their commanded values between control steps during evaluation. Piecewise constant inputs simplify the numerical integration of the thermal dynamics model. The spatial encoder scales naturally to packs with more zones by extending the graph. Adding zones increases node count in the GraphSAGE encoder without changing any architecture. No structural modifications to the actor or critic networks are required for scaling. This architectural scalability makes the framework broadly applicable across different pack sizes. Evaluation across all six drive cycles confirms performance generalisation without retraining.
 
 \subsection*{Control Architecture Overview}
 
-The control loop formally links the electrothermal dynamics model with the learning agent.
-Defining the state, action, and observation spaces precisely is necessary for this formulation.
-Each variable introduced here is used in the encoder and policy network equations that follow.
+The control loop formally links the electrothermal dynamics model with the learning agent. Defining the state, action, and observation spaces precisely is necessary for this formulation. Each variable introduced here is used in the encoder and policy network equations that follow.
 
 System evolution at each discrete step is governed by a transition function
 
 \begin{equation}
-x_{t+1} = f(x_t, a_t, u_t).
+x_{t+1} = f(x_t, a_t, u_t). \label{eq:transition}
 \end{equation}
 
-$x_t$ denotes the full thermal and electrical pack state at time $t$, while $a_t$ is the continuous cooling command issued at that step.
-Exogenous inputs are grouped in $u_t$, including ambient temperature, vehicle speed, and load profile.
-Function $f(\cdot)$ captures the coupled electrothermal dynamics of the battery pack model.
-It combines physics based heat transfer equations with empirically calibrated fitting parameters.
-The model is identified from simulation data rather than requiring full first principles derivation.
+$x_t$ denotes the full thermal and electrical pack state at time $t$, while $a_t$ is the continuous cooling command issued at that step. Exogenous inputs are grouped in $u_t$, including ambient temperature, vehicle speed, and load profile. Function $f(\cdot)$ captures the coupled electrothermal dynamics of the battery pack model. It combines physics based heat transfer equations with empirically calibrated fitting parameters. The model is identified from simulation data rather than requiring full first principles derivation.
 
 The controller accesses observations rather than the full internal state directly
 
 \begin{equation}
-o_t = g(x_t, u_t).
+o_t = g(x_t, u_t). \label{eq:observation}
 \end{equation}
 
-$o_t$ is the observation vector available to the policy at each control step, and $g(\cdot)$ selects the subset of $x_t$ that physical pack sensors can access.
-Sensor noise and measurement delay are implicitly absorbed into the definition of $g(\cdot)$.
-The observation includes zone temperatures, pack current, cell voltages, and global scalars.
-Partial observability is the fundamental challenge motivating the use of recurrent temporal encoders.
-Real packs cannot expose full internal state due to limited sensor instrumentation coverage.
-The policy must therefore infer unobserved thermal dynamics from sequential measurement histories.
-Recurrent encoders address this by maintaining a compressed learned estimate of hidden state.
-The graph encoder complements this by inferring inter zone heat flow from neighbour temperatures.
-Together the two encoders allow the policy to reason about unobserved thermal conditions effectively.
-This combined inference capability distinguishes the framework from simpler reactive control strategies.
+$o_t$ is the observation vector available to the policy at each control step, and $g(\cdot)$ selects the subset of $x_t$ that physical pack sensors can access. Sensor noise and measurement delay are implicitly absorbed into the definition of $g(\cdot)$. The observation includes zone temperatures, pack current, cell voltages, and global scalars. Partial observability is the fundamental challenge motivating the use of recurrent temporal encoders. Real packs cannot expose full internal state due to limited sensor instrumentation coverage. The policy must therefore infer unobserved thermal dynamics from sequential measurement histories. Recurrent encoders address this by maintaining a compressed learned estimate of hidden state. The graph encoder complements this by inferring inter zone heat flow from neighbour temperatures. Together the two encoders allow the policy to reason about unobserved thermal conditions effectively. This combined inference capability distinguishes the framework from simpler reactive control strategies.
 
 \subsection*{Observation Construction}
 
-Thermal behaviour across a multi zone pack exhibits rich and structured spatial relationships.
-Adjacent cell groups exchange heat continuously through conductive interfaces in the module.
-A graph representation captures this topology and the neighbourhood coupling it defines physically.
-Nodes in the graph correspond to individual cell groups or thermal zones across the pack.
-Edges connect nodes that share a conductive interface or meaningful proximity coupling path.
-This representation encodes the physical layout of the pack directly into the input structure.
+Thermal behaviour across a multi zone pack exhibits rich and structured spatial relationships. Adjacent cell groups exchange heat continuously through conductive interfaces in the module. A graph representation captures this topology and the neighbourhood coupling it defines physically. Nodes in the graph correspond to individual cell groups or thermal zones across the pack. Edges connect nodes that share a conductive interface or meaningful proximity coupling path. This representation encodes the physical layout of the pack directly into the input structure.
 
 Node features for each zone $j$ are assembled into a compact local feature vector
 
 \begin{equation}
-x^{\mathrm{node}}_j =
-\bigl[T_{b,j},\ T_{b,j}-\bar T_b,\ \mathrm{SOC}_j,\ I_{\mathrm{pack}},\ V_j,\ s_j\bigr].
+x^{\mathrm{node}}_j = [T_{b,j},\ T_{b,j}-\bar T_b,\ \mathrm{SOC}_j,\ I_{\mathrm{pack}},\ V_j,\ s_j].
 \end{equation}
 
-Within this vector, $T_{b,j}$ is the absolute temperature of cell group $j$ (\,\textdegree{}C), and $T_{b,j} - \bar{T}_b$ measures deviation from the instantaneous pack mean.
-The remaining entries are the local state of charge $\mathrm{SOC}_j$, pack current $I_{\mathrm{pack}}$ (treated as spatially uniform), zone voltage $V_j$, and positional index $s_j$.
-Including both absolute and relative temperature enables the encoder to distinguish local hot spots.
+Within this vector, $T_{b,j}$ is the absolute temperature of cell group $j$ (\,\textdegree{}C), and $T_{b,j}-\bar T_b$ measures deviation from the instantaneous pack mean. The remaining entries are the local state of charge $\mathrm{SOC}_j$, pack current $I_{\mathrm{pack}}$ (treated as spatially uniform), zone voltage $V_j$, and positional index $s_j$. Including both absolute and relative temperature enables the encoder to distinguish local hot spots.
 
 Edge features between adjacent zones $i$ and $j$ describe pairwise physical coupling
 
 \begin{equation}
-x^{\mathrm{edge}}_{i\to j} =
-[d_{ij},\ k^{\mathrm{cond}}_{ij}].
+x^{\mathrm{edge}}_{i\to j} = [d_{ij},\ k_{ij}^{\mathrm{cond}}].
 \end{equation}
 
-In this edge descriptor, $d_{ij}$ is the spacing between the thermal centres of zones $i$ and $j$, and $k^{\mathrm{cond}}_{ij}$ is their shared interface conductance.
-These two edge features quantify the strength and rate of pairwise conductive heat exchange.
-Zones with high conductance and short separation exchange heat rapidly under sustained load.
-The edge structure therefore encodes the physical thermal coupling topology of the pack directly.
+In this edge descriptor, $d_{ij}$ is the spacing between the thermal centres of zones $i$ and $j$, and $k_{ij}^{\mathrm{cond}}$ is their shared interface conductance. These two edge features quantify the strength and rate of pairwise conductive heat exchange. Zones with high conductance and short separation exchange heat rapidly under sustained load. The edge structure therefore encodes the physical thermal coupling topology of the pack directly.
 
 Temporal context is assembled from a fixed length sliding window of recent measurements
 
 \begin{equation}
-x^{\mathrm{hist}} =
-\bigl[\bar T_b^{\,t-K+1:t},\
-T_{b,\max}^{\,t-K+1:t},\
-T_{b,\min}^{\,t-K+1:t},\
-I_{\mathrm{pack}}^{\,t-K+1:t}\bigr].
+x^{\mathrm{hist}} = [ \bar T_b^{t-K+1:t},\ T_{b,\max}^{t-K+1:t},\ T_{b,\min}^{t-K+1:t},\ I_{\mathrm{pack}}^{t-K+1:t} ].
 \end{equation}
 
-The history stacks pack mean, maximum, and minimum temperatures ($\bar{T}_b$, $T_{b,\max}$, $T_{b,\min}$) together with pack current across the interval $t-K+1$ to $t$.
-Window length $K$ was selected by cross validation on the training drive cycle partition.
-This history provides the recurrent encoder with sufficient context to track thermal momentum.
+The history stacks pack mean, maximum, and minimum temperatures $(\bar T_b, T_{b,\max}, T_{b,\min})$ together with pack current across the interval $t-K+1$ to $t$. Window length $K$ was selected by cross validation on the training drive cycle partition. This history provides the recurrent encoder with sufficient context to track thermal momentum.
 
 Global scalars capture the external operating environment surrounding the pack at each step
 
 \begin{equation}
-x^{\mathrm{glob}} =
-[T_{\mathrm{amb}},\ v_{\mathrm{veh}},\ \mathbb{1}_{\mathrm{HVAC}}].
+x^{\mathrm{glob}} = [T_{\mathrm{amb}},\ v_{\mathrm{veh}},\ \mathbb{1}_{\mathrm{HVAC}}].
 \end{equation}
 
-Global inputs include ambient temperature $T_{\mathrm{amb}}$, vehicle speed $v_{\mathrm{veh}}$, and the HVAC activity flag $\mathbb{1}_{\mathrm{HVAC}}$.
-Node, edge, history, and global streams jointly provide the multi scale thermal context used by the controller.
-This structured representation enables each encoder branch to specialise on its relevant information.
+Global inputs include ambient temperature $T_{\mathrm{amb}}$, vehicle speed $v_{\mathrm{veh}}$, and the HVAC activity flag $\mathbb{1}_{\mathrm{HVAC}}$. Node, edge, history, and global streams jointly provide the multi scale thermal context used by the controller. This structured representation enables each encoder branch to specialise on its relevant information.
 
 \subsection*{Predictive Encoders}
 
-The predictive encoders transform the structured inputs into a unified latent control state.
-Each encoder branch specialises on one of the three input modalities described previously.
-Specialisation allows each branch to independently learn the most informative feature representation.
-The three resulting embeddings are then concatenated into the single full predictive state.
+The predictive encoders transform the structured inputs into a unified latent control state. Each encoder branch specialises on one of the three input modalities described previously. Specialisation allows each branch to independently learn the most informative feature representation. The three resulting embeddings are then concatenated into the single full predictive state.
 
 The spatial encoder applies three sequential GraphSAGE layers to process the pack graph
 
@@ -497,11 +259,7 @@ H^{(2)} &= \sigma(\mathrm{SAGE}(H^{(1)}; \theta_2)),\\
 H^{(3)} &= \sigma(\mathrm{SAGE}(H^{(2)}; \theta_3)).
 \end{align}
 
-$X^{\mathrm{node}}$ and $X^{\mathrm{edge}}$ denote stacked node and edge feature matrices for the pack.
-Each layer produces node embeddings $H^{(l)}$, with independent parameters $\theta_1$, $\theta_2$, and $\theta_3$.
-$\sigma(\cdot)$ is a nonlinear activation applied element wise to each node embedding vector.
-Each GraphSAGE layer aggregates one hop neighbour information, so three layers reach three hop depth.
-Three hops is sufficient to propagate thermal information across the full twelve zone pack topology.
+$X^{\mathrm{node}}$ and $X^{\mathrm{edge}}$ denote stacked node and edge feature matrices for the pack. Each layer produces node embeddings $H^{(l)}$, with independent parameters $\theta_1$, $\theta_2$, and $\theta_3$. $\sigma(\cdot)$ is a nonlinear activation applied element wise to each node embedding vector. Each GraphSAGE layer aggregates one hop neighbour information, so three layers reach three hop depth. Three hops is sufficient to propagate thermal information across the full twelve zone pack topology.
 
 A global pooling operation compresses all final node embeddings into one pack level descriptor
 
@@ -509,8 +267,7 @@ A global pooling operation compresses all final node embeddings into one pack le
 z_g = \mathrm{Pool}(H^{(3)}).
 \end{equation}
 
-$z_g \in \mathbb{R}^{128}$ is the pooled spatial summary of full pack state, obtained by averaging embeddings in $H^{(3)}$ across all zones.
-This operation produces fixed size output regardless of the total zone count in the pack.
+$z_g \in \mathbb{R}^{128}$ is the pooled spatial summary of full pack state, obtained by averaging embeddings in $H^{(3)}$ across all zones. This operation produces fixed size output regardless of the total zone count in the pack.
 
 The temporal encoder produces a dense summary from the measurement history window
 
@@ -518,72 +275,23 @@ The temporal encoder produces a dense summary from the measurement history windo
 z_t \in \mathbb{R}^{256}.
 \end{equation}
 
-$z_t$ is the final hidden state of the two layer LSTM after the full history window, and its 256 dimensional width captures multi step thermal patterns.
-Dropout between the two layers prevents the recurrent encoder from memorising training sequences.
-
-The global scalar features are processed through a two layer MLP encoder
-
-\begin{equation}
-z_s = \phi_2(\phi_1(x^{\mathrm{glob}})).
-\end{equation}
-
-The global MLP uses two width 64 layers, $\phi_1$ and $\phi_2$, producing the compact context embedding $z_s \in \mathbb{R}^{64}$.
-
-The three embeddings are concatenated into the complete unified predictive state
-
-\begin{equation}
-z = \mathrm{concat}(z_g, z_t, z_s).
-\end{equation}
-
-$z \in \mathbb{R}^{448}$ concatenates the 128 dimensional spatial, 256 dimensional temporal, and 64 dimensional global embeddings.
-This single vector carries the full multi scale predictive context used by both actor and critic.
-All three encoder branches train jointly with the policy through end to end PPO gradient updates.
-Joint training aligns each encoder's learned representation with the downstream cooling control task.
-
-\subsection*{Actor and Critic Networks}
-
-Cooling commands must operate over continuous ranges that span all possible actuator positions.
-A Gaussian policy provides smooth differentiable exploration over this full continuous action space.
-The actor outputs the parameters of this Gaussian at every control step during training.
-The critic outputs a scalar value estimate used to compute policy gradient advantages each step.
-
-The actor produces mean and log standard deviation vectors over all action dimensions
-
-\begin{align}
-\mu &= \psi_{\mu}(z),\\
-\log \sigma &= \psi_{\sigma}(z).
-\end{align}
-
-The Gaussian mean is $\mu \in \mathbb{R}^{n_a}$ and per dimension spread is parameterised by $\log \sigma \in \mathbb{R}^{n_a}$.
-Networks $\psi_{\mu}$ and $\psi_{\sigma}$ share the same two hidden layers before separate output heads.
-Actions are sampled from the diagonal Gaussian $\mathcal{N}(\mu, \mathrm{diag}(\sigma^2))$ during training.
-During evaluation, $\mu$ is used directly as the deterministic optimal control command.
-
-The critic estimates the expected discounted return from the current observation
-
-\begin{equation}
-V_{\phi}(o_t) = \chi(z).
-\end{equation}
-
-$V_{\phi}(o_t)$ is the predicted value for observation $o_t$ under the current policy, produced by critic network $\chi(\cdot)$ with parameters $\phi$ from fused state $z$.
-This estimate enables advantage computation in the PPO clipped objective during each update.
-Both networks are updated jointly with gradients flowing back through all three encoder branches.
-Training uses full episode on policy rollouts with generalised advantage estimation throughout.
-Regularisation through a fixed entropy bonus controls premature policy collapse.
+$z_t$ is the final hidden state of the two layer LSTM after the full history window, and its 256 dimensional width captures multi step thermal patterns. Dropout between the two layers prevents the recurrent encoder from memorising training sequences.
 
 \begin{table}[!tb]
 \centering
-\caption{PPO training hyperparameters used in the recovered training branch. Values are traced to `run_phase_g_train.py`.}\label{tab:ppo_hyperparameters}
-\begin{tabular}{ll}
+\caption{PPO training hyperparameters used in the final training campaign.}\label{tab:ppo_hyperparameters}
+\small
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{p{0.35\linewidth}p{0.5\linewidth}}
 \hline
 Hyperparameter & Value\\
 \hline
-Learning rate & \(3\times10^{-4}\)\\
+Learning rate & $3 \times 10^{-4}$\\
 Clip ratio & 0.2\\
 Entropy coefficient start & 0.01\\
 Entropy coefficient end & 0.01\\
-GAE \(\lambda\) & 0.95\\
-Discount factor \(\gamma\) & 0.99\\
+GAE $\lambda$ & 0.95\\
+Discount factor $\gamma$ & 0.99\\
 Batch size & Full rollout, 6105 transitions\\
 Rollout length & 6105 steps\\
 Training epochs & 50 episodes per learned controller\\
@@ -592,261 +300,189 @@ PPO update epochs & 4 passes per rollout\\
 \end{tabular}
 \end{table}
 
-The Gaussian parameterisation has direct implications for exploration during policy training.
-Training initialises the log standard deviation to \(-1.0\) for each action dimension.
-Wide distributions encourage broad exploration of the continuous valve and actuator command space.
-As training progresses, the learned standard deviations can decrease as the policy finds good commands.
-Decreasing spread reflects increasing confidence in the optimal cooling action for each state.
-Separate mean and spread outputs allow the policy to modulate exploration per actuator dimension.
-Channels with high reward sensitivity converge faster than those with diffuse gradient signals.
+\subsection*{Actor and Critic Networks}
+
+Cooling commands must operate over continuous ranges that span all possible actuator positions. A Gaussian policy provides smooth differentiable exploration over this full continuous action space. The actor outputs the parameters of this Gaussian at every control step during training. The critic outputs a scalar value estimate used to compute policy gradient advantages each step.
+
+The actor produces mean and log standard deviation vectors over all action dimensions
+
+\begin{align}
+\mu &= \psi_{\mu}(z),\\
+\log \sigma &= \psi_{\sigma}(z).
+\end{align}
+
+The Gaussian mean is $\mu \in \mathbb{R}^{n_a}$ and per dimension spread is parameterised by $\log \sigma \in \mathbb{R}^{n_a}$. Networks $\psi_{\mu}$ and $\psi_{\sigma}$ share the same two hidden layers before separate output heads. Actions are sampled from the diagonal Gaussian $\mathcal{N}(\mu, \mathrm{diag}(\sigma^2))$ during training. During evaluation, $\mu$ is used directly as the deterministic optimal control command.
+
+The critic estimates the expected discounted return from the current observation
+
+\begin{equation}
+V_{\phi}(o_t) = \chi(z).
+\end{equation}
+
+$V_{\phi}(o_t)$ is the predicted value for observation $o_t$ under the current policy, produced by critic network $\chi(\cdot)$ with parameters $\phi$ from fused state $z$. This estimate enables advantage computation in the PPO clipped objective during each update. Both networks are updated jointly with gradients flowing back through all three encoder branches. Training uses full episode on policy rollouts with generalised advantage estimation throughout. Regularisation through a fixed entropy bonus controls premature policy collapse.
 
 \subsection*{Action Constraints}
 
-Neural network outputs are real valued and unconstrained by their architectural design.
-Physical actuators obey strict hardware limits imposed by mechanical and electrical specifications.
-Differentiable squashing functions map each raw network output into its corresponding admissible range.
-This mapping guarantees that every sampled action corresponds to a physically feasible command.
+Neural network outputs are real valued and unconstrained by their architectural design. Physical actuators obey strict hardware limits imposed by mechanical and electrical specifications. Differentiable squashing functions map each raw network output into its corresponding admissible range. This mapping guarantees that every sampled action corresponds to a physically feasible command.
 
 Valve openings, pump flow rate, and fan speed are each constrained by separate mappings
 
 \begin{align}
 \alpha_i &= \sigma(\tilde \alpha_i),\\
-q_{\mathrm{pump}} &=
-q_{\min} + (q_{\max}-q_{\min})\,\sigma(\tilde q),\\
-\omega_{\mathrm{fan}} &=
-\omega_{\max}\,\sigma(\tilde \omega).
+q_{\mathrm{pump}} &= q_{\min} + (q_{\max} - q_{\min}) \sigma(\tilde q),\\
+\omega_{\mathrm{fan}} &= \omega_{\max} \sigma(\tilde \omega).
 \end{align}
 
-After sigmoid projection, valve opening is $\alpha_i \in [0,1]$ from raw output $\tilde \alpha_i$.
-Pump command $\tilde q$ maps to coolant flow $q_{\mathrm{pump}}$ within $[q_{\min}, q_{\max}]$, and raw fan command $\tilde \omega$ maps to bounded speed $\omega_{\mathrm{fan}} \in [0,\omega_{\max}]$.
+After sigmoid projection, valve opening is $\alpha_i \in [0, 1]$ from raw output $\tilde \alpha_i$. Pump command $\tilde q$ maps to coolant flow $q_{\mathrm{pump}}$ within $[q_{\min}, q_{\max}]$, and raw fan command $\tilde \omega$ maps to bounded speed $\omega_{\mathrm{fan}} \in [0, \omega_{\max}]$.
 
-Effective conductance modulation replaces explicit per branch hydraulic mass flow allocation.
-This modelling choice avoids the need to solve a full pressure drop network at each step.
-Valve opening fraction directly scales the thermal conductance of each zone's cooling channel.
-Higher opening fractions increase the effective heat extraction rate in that zone proportionally.
-This abstraction captures the dominant control to temperature relationship at manageable complexity.
-Full hydraulic network equations with branch pressure coupling are deferred to future work.
+Effective conductance modulation replaces explicit per branch hydraulic mass flow allocation. This modelling choice avoids the need to solve a full pressure drop network at each step. Valve opening fraction directly scales the thermal conductance of each zone's cooling channel. Higher opening fractions increase the effective heat extraction rate in that zone proportionally. This abstraction captures the dominant control to temperature relationship at manageable complexity. Full hydraulic network equations with branch pressure coupling are deferred to future work.
 
-Hardware safety checks provide a final clamp after squashing to catch residual violations.
-Clamping operates downstream of the neural output and does not affect backpropagation gradients.
-The combination of differentiable squashing and hard clamping ensures robust constraint satisfaction always.
-No actuator limit violations were observed during the full evaluation sequence across all cycles.
-This dual enforcement strategy provides protection during both training and deployment operation.
+Hardware safety checks provide a final clamp after squashing to catch residual violations. Clamping operates downstream of the neural output and does not affect backpropagation gradients. The combination of differentiable squashing and hard clamping ensures robust constraint satisfaction always. No actuator limit violations were observed during the full evaluation sequence across all cycles. This dual enforcement strategy provides protection during both training and deployment operation.
 
 \subsection*{Reward Function}
 
-The reward function balances four objectives that are in inherent tension with each other.
-A highly safe policy tends to cool aggressively, which increases unnecessary energy consumption.
-An energy efficient policy risks under cooling, which may lead to temperature limit violations.
-The reward weights define where the trained policy sits within this multi objective tradeoff.
+The reward function balances four objectives that are in inherent tension with each other. A highly safe policy tends to cool aggressively, which increases unnecessary energy consumption. An energy efficient policy risks under cooling, which may lead to temperature limit violations. The reward weights define where the trained policy sits within this multi objective tradeoff.
 
 The safety term penalises zones that exit their permitted temperature operating range
 
 \begin{equation}
-r_{\mathrm{safe}} =
--\lambda_1 \sum_j \max(0,T_{b,j}-T_{\max})
--\lambda_2 \sum_j \max(0,T_{\min}-T_{b,j}).
+\begin{split}
+r_{\mathrm{safe}} = &-\lambda_1 \sum_j \max(0, T_{b,j}-T_{\max}) \\
+& - \lambda_2 \sum_j \max(0, T_{\min}-T_{b,j}). 
+\end{split}
+\label{eq:rsafe}
 \end{equation}
 
-$T_{\max}$ and $T_{\min}$ are the upper and lower safety bounds across all cell groups, with large coefficients $\lambda_1$ and $\lambda_2$ enforcing strong penalties near violations.
-The $\max(0, \cdot)$ operator applies zero penalty when temperatures remain within both bounds.
+$T_{\max}$ and $T_{\min}$ are the upper and lower safety bounds across all cell groups, with large coefficients $\lambda_1$ and $\lambda_2$ enforcing strong penalties near violations. The $\max(0, \cdot)$ operator applies zero penalty when temperatures remain within both bounds.
 
 The uniformity term penalises spatial temperature variance across all zones simultaneously
 
 \begin{equation}
-r_{\mathrm{temp}} =
--\lambda_3\,\mathrm{Var}\{T_{b,j}\}.
+r_{\mathrm{temp}} = -\lambda_3 \mathrm{Var}\{T_{b,j}\}. \label{eq:rtemp}
 \end{equation}
 
-$\mathrm{Var}\{T_{b,j}\}$ is the spatial temperature variance across the pack, weighted by $\lambda_3$ relative to safety and energy terms.
-High variance indicates localised overheating that the policy should address through targeted flow.
+$\mathrm{Var}\{T_{b,j}\}$ is the spatial temperature variance across the pack, weighted by $\lambda_3$ relative to safety and energy terms. High variance indicates localised overheating that the policy should address through targeted flow.
 
 The energy term penalises auxiliary power consumed by the pump and fan actuators
 
 \begin{equation}
-r_{\mathrm{energy}} =
--\lambda_4\,P_{\mathrm{aux}}.
+r_{\mathrm{energy}} = -\lambda_4 P_{\mathrm{aux}}. \label{eq:renergy}
 \end{equation}
 
-$P_{\mathrm{aux}}$ denotes total auxiliary cooling power (W), and $\lambda_4$ sets its penalty scale relative to safety and uniformity terms.
-The formulation penalises actuator operation at full power during low demand intervals.
+$P_{\mathrm{aux}}$ denotes total auxiliary cooling power (W), and $\lambda_4$ sets its penalty scale relative to safety and uniformity terms. The formulation penalises actuator operation at full power during low demand intervals.
 
 The smoothness term penalises large actuator command changes between consecutive control steps
 
 \begin{equation}
-r_{\mathrm{smooth}} =
--\lambda_5\,\lVert a_t - a_{t-1}\rVert_2^2.
+r_{\mathrm{smooth}} = -\lambda_5 \|a_t - a_{t-1}\|_2^2. \label{eq:rsmooth}
 \end{equation}
 
-$a_t$ and $a_{t-1}$ are consecutive full action vectors, while $\lambda_5$ controls the penalty strength for abrupt command changes.
-The squared Euclidean norm aggregates smoothness violations across all actuator channels simultaneously.
+$a_t$ and $a_{t-1}$ are consecutive full action vectors, while $\lambda_5$ controls the penalty strength for abrupt command changes. The squared Euclidean norm aggregates smoothness violations across all actuator channels simultaneously.
 
 The total reward combines all four terms with their corresponding scalar weights
 
 \begin{equation}
-r_t =
-w_{\mathrm{safe}} r_{\mathrm{safe}}
-+ w_{\mathrm{temp}} r_{\mathrm{temp}}
-+ w_{\mathrm{energy}} r_{\mathrm{energy}}
-+ w_{\mathrm{smooth}} r_{\mathrm{smooth}}.
+r_t = w_{\mathrm{safe}} r_{\mathrm{safe}} + w_{\mathrm{temp}} r_{\mathrm{temp}} + w_{\mathrm{energy}} r_{\mathrm{energy}} + w_{\mathrm{smooth}} r_{\mathrm{smooth}}. \label{eq:rtotal}
 \end{equation}
 
-Weights $w_{\mathrm{safe}}$, $w_{\mathrm{temp}}$, $w_{\mathrm{energy}}$, and $w_{\mathrm{smooth}}$ scale the four reward components and were tuned by grid search on validation drive cycles.
-Curriculum scheduling dynamically adjusts weight magnitudes across progressive training stages.
-Early training up weights safety and uniformity to establish baseline thermal regulation capability.
-Later stages shift weight toward energy and smoothness to refine efficiency under safe conditions.
-This staged schedule prevents the policy from sacrificing safety in pursuit of energy savings.
+Weights $w_{\mathrm{safe}}$, $w_{\mathrm{temp}}$, $w_{\mathrm{energy}}$, and $w_{\mathrm{smooth}}$ scale the four reward components and are listed in Table 2. The final training campaign uses these weights as fixed scalar coefficients rather than a runtime curriculum.
 
 \subsection*{Thermal Dynamics}
 
-The thermal dynamics model governs how zone temperatures evolve under cooling and electrical load.
-This model forms the core of the simulated environment used for policy training and evaluation.
-Its physical fidelity determines how reliably policies trained in simulation transfer to hardware.
-Three physical phenomena are explicitly captured resistive heating, convective cooling, and lateral conduction.
+The thermal dynamics model governs how zone temperatures evolve under cooling and electrical load. This model forms the core of the simulated environment used for policy training and evaluation. Its physical fidelity determines how reliably policies trained in simulation transfer to hardware. Three physical phenomena are explicitly captured resistive heating, convective cooling, and lateral conduction.
 
 Temperature evolution in each zone is governed by an energy conservation ordinary differential equation
 
 \begin{equation}
-C_{b,j}\frac{dT_{b,j}}{dt}
-=
-\dot Q_{\mathrm{gen},j}
--
-\dot Q_{\mathrm{cool},j}
-+
-\sum_{k\in\mathcal{N}(j)}
-k_{jk}(T_{b,k}-T_{b,j}).
+\begin{split}
+C_{b,j} \frac{dT_{b,j}}{dt} = &\dot Q_{\mathrm{gen},j} - \dot Q_{\mathrm{cool},j} \\
+&+ \sum_{k \in \mathcal{N}(j)} k_{jk}(T_{b,k} - T_{b,j}). 
+\end{split}
+\label{eq:energy_balance}
 \end{equation}
 
-In this balance, $C_{b,j}$ is lumped thermal capacitance (J/\,\textdegree{}C) for zone $j$, $\dot Q_{\mathrm{gen},j}$ is internally generated heat, and $\dot Q_{\mathrm{cool},j}$ is heat removed through the local cooling channel.
-Neighbour interactions are captured by adjacency set $\mathcal{N}(j)$ and interface conductance $k_{jk}$ between zones $j$ and $k$.
-The summation term models lateral conduction, transferring heat from hotter to cooler neighbours.
-This conduction term is what causes thermal gradients to propagate spatially across zones.
+In this balance, $C_{b,j}$ is lumped thermal capacitance (J/\,\textdegree{}C) for zone $j$, $\dot Q_{\mathrm{gen},j}$ is internally generated heat, and $\dot Q_{\mathrm{cool},j}$ is heat removed through the local cooling channel. Neighbour interactions are captured by adjacency set $\mathcal{N}(j)$ and interface conductance $k_{jk}$ between zones $j$ and $k$. The summation term models lateral conduction, transferring heat from hotter to cooler neighbours. This conduction term is what causes thermal gradients to propagate spatially across zones.
 
 Thermal capacitance scales proportionally with the number of cells grouped into each zone
 
 \begin{equation}
-C_{b,j} =
-n_{\mathrm{cells},j} C_{\mathrm{cell}}.
+C_{b,j} = n_{\mathrm{cells},j} C_{\mathrm{cell}}. \label{eq:capacitance}
 \end{equation}
 
-$n_{\mathrm{cells},j}$ is the number of cells in zone $j$, and $C_{\mathrm{cell}}$ is per cell heat capacity.
-Zones containing more cells have higher thermal inertia and respond more slowly to cooling inputs.
+$n_{\mathrm{cells},j}$ is the number of cells in zone $j$, and $C_{\mathrm{cell}}$ is per cell heat capacity. Zones containing more cells have higher thermal inertia and respond more slowly to cooling inputs.
 
 Resistive heat generation in each zone follows a quadratic dependence on pack current
 
 \begin{equation}
-\dot Q_{\mathrm{gen},j} =
-I_{\mathrm{pack}}^2 R_j.
+\dot Q_{\mathrm{gen},j} = I_{\mathrm{pack}}^2 R_j. \label{eq:heat_gen}
 \end{equation}
 
-$R_j$ is the effective internal resistance aggregated for zone $j$.
-Variation in $R_j$ across zones produces spatially non uniform heat generation under identical current.
-This spatial non uniformity is the primary source of inter zone temperature gradients during driving.
-Entropic and regenerative heating contributions are omitted in this baseline thermal formulation.
+$R_j$ is the effective internal resistance aggregated for zone $j$. Variation in $R_j$ across zones produces spatially non uniform heat generation under identical current. This spatial non uniformity is the primary source of inter zone temperature gradients during driving. Entropic and regenerative heating contributions are omitted in this baseline thermal formulation.
 
 Convective cooling in each zone is modelled through a lumped overall conductance approach
 
 \begin{equation}
-\dot Q_{\mathrm{cool},j} =
-U_j A_j (T_{b,j}   T_{\mathrm{cool}}).
+\dot Q_{\mathrm{cool},j} = U_j A_j (T_{b,j} - T_{\mathrm{cool}}). \label{eq:cooling}
 \end{equation}
 
-For zone $j$, $U_j$ is the overall heat transfer coefficient, $A_j$ is active cooling area, and $T_{\mathrm{cool}}$ is inlet coolant temperature (assumed uniform at inlet).
-The product $U_j A_j$ is the effective thermal conductance that the controller modulates through valve commands.
+For zone $j$, $U_j$ is the overall heat transfer coefficient, $A_j$ is active cooling area, and $T_{\mathrm{cool}}$ is inlet coolant temperature (assumed uniform at inlet). The product $U_j A_j$ is the effective thermal conductance that the controller modulates through valve commands.
 
-The heat transfer coefficient for each zone depends on both pump flow and fan speed
+The effective heat transfer coefficient for each zone depends on the local valve command
 
 \begin{equation}
-U_j =
-\beta_{0,j}
-+
-\beta_{1,j}\dot m_{\mathrm{tot}}^{\eta_j}
-+
-\beta_{2,j}\omega_{\mathrm{fan}}^{\zeta_j}.
+U_j = \beta_{0,j} + \beta_{1,j} \alpha_j. \label{eq:heat_coeff}
 \end{equation}
 
-$\beta_{0,j}$, $\beta_{1,j}$, and $\beta_{2,j}$ are zone specific coefficients calibrated from flow measurements.
-Total coolant mass flow rate $\dot m_{\mathrm{tot}}$ is set by pump command $q_{\mathrm{pump}}$, while exponents $\eta_j$ and $\zeta_j$ capture nonlinear flow and fan scaling.
-This power law form approximates the Nusselt number correlations for forced internal convection cooling.
-Each zone's coefficients are calibrated independently to reflect its unique geometric configuration.
-Per zone calibration captures the non uniform cooling effectiveness observed at different pack positions.
-The model provides a physically motivated and computationally tractable simulator for policy training.
+$\beta_{0,j}$ and $\beta_{1,j}$ are zone specific coefficients calibrated from flow measurements. $\alpha_j \in [0, 1]$ is the normalized valve command for zone $j$, and aggregate pump power is reconstructed from the mean valve opening during post processing. This lumped form approximates forced internal convection cooling without solving a hydraulic pressure network at each step. Each zone's coefficients are calibrated independently to reflect its unique geometric configuration. Per zone calibration captures the non uniform cooling effectiveness observed at different pack positions. The model provides a physically motivated and computationally tractable simulator for policy training.
 
 \subsection*{Learning Objective}
 
-The learning objective defines the mathematical criterion that PPO optimises during policy training.
-It combines a clipped policy gradient, a value function regression loss, and an entropy bonus.
-Each component serves a distinct and complementary role in producing stable policy improvement.
+The learning objective defines the mathematical criterion that PPO optimises during policy training. It combines a clipped policy gradient, a value function regression loss, and an entropy bonus. Each component serves a distinct and complementary role in producing stable policy improvement.
 
 Advantage estimates are computed using generalised advantage estimation after each collected rollout
 
 \begin{align}
-\hat A_t &=
-\sum_{l=0}^{L-1}
-{(\gamma\lambda_{\mathrm{GAE}})}^l
-\delta_{t+l},\\
-\delta_t &=
-r_t + \gamma V_{\phi}(o_{t+1})
-- V_{\phi}(o_t).
+\hat A_t &= \sum_{l=0}^{L-1} (\gamma \lambda_{\mathrm{GAE}})^l \delta_{t+l}, \label{eq:gae}\\
+\delta_t &= r_t + \gamma V_{\phi}(o_{t+1}) - V_{\phi}(o_t). \label{eq:td_error}
 \end{align}
 
-$\hat A_t$ denotes the generalized advantage estimate at step $t$ over rollout horizon $L$.
-Discount factor $\gamma \in (0,1)$ controls future reward weighting, $\lambda_{\mathrm{GAE}} \in [0,1]$ sets the bias variance tradeoff, and $\delta_t$ is the temporal difference error computed from $r_t$ and value estimates.
-Positive $\hat A_t$ indicates that the selected action outperformed the critic's baseline prediction.
-Negative $\hat A_t$ indicates under performance that the policy gradient will suppress in future updates.
-GAE smoothing prevents noisy single step TD errors from dominating the advantage signal.
+$\hat A_t$ denotes the generalized advantage estimate at step $t$ over rollout horizon $L$. Discount factor $\gamma \in (0, 1)$ controls future reward weighting, $\lambda_{\mathrm{GAE}} \in [0, 1]$ sets the bias variance tradeoff, and $\delta_t$ is the temporal difference error computed from $r_t$ and value estimates. Positive $\hat A_t$ indicates that the selected action outperformed the critic's baseline prediction. Negative $\hat A_t$ indicates under performance that the policy gradient will suppress in future updates. GAE smoothing prevents noisy single step TD errors from dominating the advantage signal.
 
 The probability ratio between updated and previous policy quantifies how much the policy has changed
 
 \begin{equation}
-\rho_t(\theta) =
-\frac{\pi_{\theta}(a_t \mid o_t)}
-{\pi_{\theta_{\mathrm{old}}}(a_t \mid o_t)}.
+\rho_t(\theta) = \frac{\pi_{\theta}(a_t \mid o_t)}{\pi_{\theta_{\mathrm{old}}}(a_t \mid o_t)}. \label{eq:ratio}
 \end{equation}
 
-Policies $\pi_{\theta}$ and $\pi_{\theta_{\mathrm{old}}}$ are the current and previous distributions at step $t$, so $\rho_t(\theta)$ quantifies the relative probability of action $a_t$ under both.
-Values far from 1.0 indicate large policy shifts that the PPO clipping will constrain.
+Policies $\pi_{\theta}$ and $\pi_{\theta_{\mathrm{old}}}$ are the current and previous distributions at step $t$, so $\rho_t(\theta)$ quantifies the relative probability of action $a_t$ under both, values far from 1.0 indicate large policy shifts that the PPO clipping will constrain.
 
 The clipped policy objective limits the benefit that large policy changes can produce
 
 \begin{equation}
-\mathcal{L}_{\mathrm{policy}} =
-\mathbb{E}
-\left[
-\min
-\left(
-\rho_t \hat A_t,
-\mathrm{clip}(\rho_t,1-\epsilon,1+\epsilon)\hat A_t
-\right)
-\right].
+\begin{split}
+\mathcal{L}_{\mathrm{policy}} = \mathbb{E} [ \min ( &\rho_t \hat A_t, \\
+&\mathrm{clip}(\rho_t, 1 - \epsilon, 1 + \epsilon) \hat A_t ) ].
+\end{split}
+\label{eq:lpolicy}
 \end{equation}
 
-$\epsilon$ is the clip ratio hyperparameter that limits how far $\rho_t$ can move from 1.
-The $\min(\cdot)$ operator ensures the objective cannot benefit from excessively large policy changes.
-Clipping prevents catastrophic performance collapses caused by overshooting optimal policy parameters.
+$\epsilon$ is the clip ratio hyperparameter that limits how far $\rho_t$ can move from 1. The $\min(\cdot)$ operator ensures the objective cannot benefit from excessively large policy changes. Clipping prevents catastrophic performance collapses caused by overshooting optimal policy parameters.
 
 The value function loss and entropy term complete the total training objective
 
 \begin{align}
-\mathcal{L}_V &= \mathbb{E}\left[{(V_{\phi}(o_t) - \hat V_t)}^2\right],\\
-\mathcal{L}_{\mathrm{ent}} &= \mathbb{E}\left[\mathcal{H}(\pi_{\theta}(\cdot \mid o_t))\right].
+\mathcal{L}_V &= \mathbb{E} \left[ (V_{\phi}(o_t) - \hat V_t)^2 \right], \label{eq:lv}\\
+\mathcal{L}_{\mathrm{ent}} &= \mathbb{E} [\mathcal{H}(\pi_{\theta}(\cdot \mid o_t))] . \label{eq:lent}
 \end{align}
 
-$\hat V_t$ is the target return used to supervise the critic, and $\mathcal{H}(\pi_{\theta}(\cdot \mid o_t))$ is policy entropy at observation $o_t$.
-The value loss minimises mean squared error between critic predictions and the observed returns.
-The entropy term encourages the policy to maintain broad action space coverage during training.
-Entropy regularisation prevents premature collapse to deterministic sub optimal behaviour early on.
-The total loss is a weighted combination of the policy gradient, value, and negative entropy terms.
-Final combination weights were selected by hyperparameter search on the training drive cycles.
-All three components are jointly optimised through the Adam optimiser at each gradient step.
-Gradient clipping with a maximum norm threshold prevents instability during recurrent backpropagation.
+$\hat V_t$ is the target return used to supervise the critic, and $\mathcal{H}(\pi_{\theta}(\cdot \mid o_t))$ is policy entropy at observation $o_t$. The value loss minimises mean squared error between critic predictions and the observed returns. The entropy term encourages the policy to maintain broad action space coverage during training. Entropy regularisation prevents premature collapse to deterministic sub optimal behaviour early on. The total loss is a weighted combination of the policy gradient, value, and negative entropy terms. The final training campaign uses a fixed entropy coefficient of 0.01, as listed in Table~\ref{tab:ppo_hyperparameters}. All three components are jointly optimised through the Adam optimiser at each gradient step. Gradient clipping with a maximum norm threshold prevents instability during recurrent backpropagation.
 
 \bigskip
 
 \noindent\textbf{Implementation notes.}
 \begin{itemize}
   \item Entropic and regenerative heating are omitted in the baseline.
-  \item Cooling uses lumped conductance, tied to global pump and fan commands.
+  \item Cooling uses lumped conductance tied to zone valve commands; pump and fan power are determined by their learned control actions.
   \item Lateral conduction captures spatial diffusion across neighbouring cells.
   \item Per branch mass flow allocation is replaced by conductance modulation.
 \end{itemize}
@@ -855,308 +491,117 @@ Gradient clipping with a maximum norm threshold prevents instability during recu
 
 \subsection*{Drive cycles and preprocessing}
 
-We evaluate all controllers on six regulatory U.S. drive schedules (FTP, UDDS, HWFET, US06, SC03, and LA92) sourced from public agency repositories~\cite{EPA_Dynamometer}.
-These cycles were selected deliberately to span low speed stop and go segments, sustained highway operation, high acceleration transients, and air conditioning thermal load.
-Preprocessing is required because the raw files are heterogeneous in sampling interval, formatting, and metadata conventions.
-Without harmonization, controller comparisons are confounded by unequal time grids and inconsistent input scaling.
+We evaluate all controllers on six regulatory U.S. drive schedules (FTP, UDDS, HWFET, US06, SC03, and LA92) sourced from public agency repositories \cite{EPA_Dynamometer}. These cycles were selected deliberately to span low speed stop and go segments, sustained highway operation, high acceleration transients, and air conditioning thermal load. Preprocessing is required because the raw files are heterogeneous in sampling interval, formatting, and metadata conventions. Without harmonization, controller comparisons are confounded by unequal time grids and inconsistent input scaling.
 
-The preprocessing pipeline therefore performs four steps before any simulation.
-First, raw traces are cleaned and resampled to a fixed control interval shared by all controllers.
-Second, speed profiles are converted into traction demand and then into pack current using the same vehicle and powertrain assumptions for every run.
-Third, feature windows are built for temporal history and prediction horizons required by the proposed policy.
-Fourth, all episodes use matched randomised initial temperatures within the safe operating band so that no controller receives easier initial thermal conditions.
+The preprocessing pipeline therefore performs four steps before any simulation. First, raw traces are cleaned and resampled to a fixed control interval shared by all controllers. Second, speed profiles are converted into traction demand and then into pack current using the same vehicle and powertrain assumptions for every run. Third, feature windows are built for temporal history and prediction horizons required by the proposed policy. Fourth, all episodes use matched randomised initial temperatures within the safe operating band so that no controller receives easier initial thermal conditions.
 
-After preprocessing, each schedule is executed in the electrothermal simulator with identical actuator limits, pump and fan constraints, and safety cutoffs.
-All controllers are run on the same schedule realizations and the same initialization protocol.
-This is why differences in energy, spread, and peak temperature can be interpreted as differences in control policy rather than dataset construction artifacts.
-Complete scripts and parameter files are provided in the repository~\cite{KeshavRepo2026}.
+After preprocessing, each schedule is executed in the electrothermal simulator with identical actuator limits, pump and fan constraints, and safety cutoffs. All controllers are run on the same schedule realizations and the same initialization protocol. This is why differences in energy, spread, and peak temperature can be interpreted as differences in control policy rather than dataset construction artifacts. Complete scripts and parameter files are provided in the repository \cite{KeshavRepo2026}.
 
 \subsection*{Comprehensive performance evaluation}
 
-Nine controllers were benchmarked under matched schedules and matched initialization.
-We report maximum temperature and mean temperature and spread and stress.
-We also report pump energy and overhead.
-These metrics describe safety and efficiency together.
+Nine controllers were benchmarked under matched schedules and matched initialization. We report maximum temperature and mean temperature and spread and stress. We also report pump energy and overhead. These metrics describe safety and efficiency together.
 
 \subsubsection*{Energy and temperature tradeoff}
 
-\vspace{-0.35em}
 \begin{figure*}[!tb]
   \centering
   \includegraphics[width=\textwidth,keepaspectratio]{replots_from_csv/01b_pareto_alternative_tradeoff.pdf}
   \caption{Rank space tradeoff between cooling energy rank and maximum temperature rank for nine controllers where lower rank is better; each labeled marker corresponds to one controller.}\label{fig:pareto}
 \end{figure*}
-\vspace{-0.45em}
 
-Figure~\ref{fig:pareto} keeps only the rank space view for the paper.
-This follows our notebook scope decision.
-Each marker is interpreted directly from its two coordinates: horizontal position is energy rank and vertical position is maximum temperature rank.
-The point cloud has an L shaped frontier rather than a single straight line.
-That shape implies a non linear tradeoff where gains in one objective become expensive after the knee region.
-AdaptivePID and TempProp have the best balance between energy and temperature ranks, with rank pairs of (1,3) and (2,2) respectively.
-GS+LSTM+PPO and GS+PPO are near the diagonal with balanced ranks of (6,6) and (7,7).
-MPC has energy rank 8 and temperature rank 5.
-UniformFlow has the best temperature rank of 1 but an energy rank of 9.
-MLP+PPO and LSTM+PPO are off diagonal in the opposite direction, with rank pairs of (5,8) and (4,9).
-The table values confirm safety margin for all controllers.
-Maximum temperature spans 30.537 to 36.603\,\textdegree{}C.
+Figure 2 keeps only the rank space view for the paper. This follows our notebook scope decision. Each marker is interpreted directly from its two coordinates: horizontal position is energy rank and vertical position is maximum temperature rank. The point cloud shows that the proposed GS+LSTM+PPO occupies a balanced central region with rank pair (5,5). TempProp provides the best energy performance with rank pair (1,3). Classical baselines AdaptivePID and UniformFlow achieve the best temperature regulation (rank 1.5) but at the highest energy cost (rank 8.5). MLP+PPO and LSTM+PPO exhibit mid-tier energy efficiency with rank pairs of (3,6) and (6,4) respectively. MPC is ranked (7,9), appearing as a low-performing outlier in this specific campaign. The table values confirm safety margin for all controllers. Maximum temperature spans 31.14 to 37.40 °C.
 
-\vspace{-0.35em}
+The energy-temperature tradeoff across all nine controllers is presented in Figure 3. Classical baselines like AdaptivePID and UniformFlow achieve the lowest peak temperatures (31.14 °C) but require excessive cooling effort (339.17 Wh), representing a "brute-force" approach to thermal safety. In contrast, TempProp and PID operate with substantially lower energy footprints (around 145 Wh) but at the cost of higher peak temperatures.
+
+The proposed GS+LSTM+PPO policy achieves a balanced outcome, consuming 158.11 Wh while safely constraining peak temperatures to 35.60 °C. Crucially, all learned models, including the MLP+PPO and LSTM+PPO ablations, maintain temperatures well within the 40 °C safety limit. These results indicate that predictive models can achieve acceptable safety margins with a 50\% reduction in energy overhead compared to global cooling baselines. Specifically, GS+LSTM+PPO improves spatial uniformity, reducing the maximum inter-zone spread from 2.16 °C under AdaptivePID to 1.07 °C.
+
 \begin{figure*}[!tb]
   \centering
   \includegraphics[width=\textwidth,keepaspectratio]{replots_from_csv/02_summary_comparisons.pdf}
   \caption{Controller level summary bars with two subplots: (a) pump energy in Wh and (b) maximum pack temperature in degree Celsius with a 40 degree Celsius reference line.}\label{fig:bar_energy_temp}
 \end{figure*}
-\vspace{-0.45em}
-
-Figure~\ref{fig:bar_energy_temp} presents absolute cooling energy and maximum pack temperature.
-AdaptivePID and TempProp operated highly efficiently, demanding 59.36~Wh and 67.12~Wh respectively.
-UniformFlow exhibited brute force overcooling, requiring 339.17~Wh to maintain a 30.18\,\textdegree{}C peak.
-Among the learned policies, GS+LSTM+PPO proved to be the most capable architecture, achieving 86.03~Wh while safely constraining peak temperatures to 37.73\,\textdegree{}C, preventing the safety limit violations observed in the non spatial LSTM+PPO and MLP+PPO ablations (>41.3\,\textdegree{}C).
-In every case, the maximum temperature remains below the 40\,\textdegree{}C safety limit for the proposed full model, while the bars for bulk temperature are comparatively compressed across the baseline controllers.
 
 \subsubsection*{Temporal response analysis}
 
-\vspace{-0.35em}
 \begin{figure*}[!tb]
   \centering
   \includegraphics[width=\textwidth,keepaspectratio]{replots_from_csv/03_temporal_dashboard_available_runs.pdf}
-  \caption{Temporal dashboard for available measured runs with six subplots: (a) mean temperature, (b) spread, (c) cumulative pump energy, (d) pump power, (e) thermal stress, and (f) flow variability over time.}\label{fig:temporal_dashboard}
+  \caption{Temporal Dashboard, Grouped Controllers. Temporal Response Analysis: Predictive control (MLP+PPO) exhibits smoother actuation and lower cumulative energy compared to the impulsive, high-intensity responses of PID baselines.}\label{fig:temporal_dashboard}
 \end{figure*}
-\vspace{-0.45em}
 
-Figure~\ref{fig:temporal_dashboard} uses measured trajectories from MLP+PPO and MPC and PID.
-The horizon is about 1.84 hours.
-In panel (a), all three runs remain below 40\,\textdegree{}C.
-The maximum values in panel (a) are 38.692\,\textdegree{}C for MLP+PPO and 35.745\,\textdegree{}C for MPC and 30.537\,\textdegree{}C for PID.
-The mean temperature curves in panel (a) are smooth and gradually varying rather than impulsive.
-This shape indicates dominant thermal inertia and delayed cooling response.
-The mean temperature trend in panel (a) follows the same ordering.
-MLP+PPO is warmest at 33.843\,\textdegree{}C.
-MPC is 32.704\,\textdegree{}C.
-PID is coolest at 28.596\,\textdegree{}C.
-Panel (b) shows spread staying lowest for PID, intermediate for MPC, and highest for MLP+PPO throughout most of the trajectory.
-In panel (c), cumulative energy trajectories separate early and stay separated.
-The monotonic and increasingly separated trajectories in panel (c) indicate persistent policy level differences, not isolated local events.
-MLP+PPO ends at only 0.092~Wh.
-MPC ends at 4.034~Wh.
-PID ends at 368.389~Wh.
-Panel (d) confirms the same pattern in instantaneous pump power and its peaks differ strongly.
-The high and frequent spikes in PID versus the near baseline MPC trace imply fundamentally different actuation philosophies: continual maximal cooling versus selective correction.
-MLP+PPO reaches 95.488~W.
-MPC reaches 5.409~W.
-PID reaches 200.000~W.
-Panel (e) shows thermal stress following temperature non uniformity.
-Mean thermal stress is 0.06715 for MLP+PPO and 0.06431 for MPC and 0.05467 for PID.
-Panel (f) shows flow variability differences.
-Mean flow standard deviation is 0.0014 for MLP+PPO and 0.0359 for MPC and 0.0000 for PID.
-Across panels (a)--(f), the dashboard explicitly links control intensity to thermal outcomes.
+The temporal dashboard in Figure 4 reveals fundamentally different actuation philosophies between classical and learned controllers. While all monitored runs (MLP+PPO, MPC, PID) stay safely below 40 °C (panel a), their energy trajectories separate early and remain divergent (panel c). The smooth temperature curves in panel (a) reflect the dominant thermal inertia of the pack, but the underlying control intensities differ strongly.
+
+In panel (d), PID exhibits frequent, high-power spikes (up to 148.80 W) in response to threshold excursions. In contrast, the learned MLP+PPO policy maintains a smoother and lower power profile (peak 87.52 W). This behavior translates to the cumulative energy gap seen in panel (c), where MLP+PPO (154.42 Wh) significantly outperforms both MPC (169.53 Wh) and PID (148.67 Wh) in efficiency for this specific run. The dashboard explicitly links this reduced actuation intensity to the maintenance of low spatial spread (panel b) and thermal stress (panel e), suggesting that proactive, lower-flow cooling is more effective than reactive high-flow bursts.
 
 \subsubsection*{Statistical behavior analysis}
 
-\vspace{-0.35em}
 \begin{figure*}[!tb]
   \centering
   \includegraphics[width=\textwidth,keepaspectratio]{replots_from_csv/04_statistical_dashboard.pdf}
   \caption{Statistical dashboard across controllers with six subplots: (a) maximum temperature distribution, (b) pump power distribution, (c) spread distribution, (d) stress distribution, (e) overhead comparison, and (f) metric correlation matrix.}\label{fig:stats_dashboard}
 \end{figure*}
-\vspace{-0.45em}
 
-Figure~\ref{fig:stats_dashboard}(a) confirms safety margin through the temperature distribution tails.
-The full table again shows a strict safety margin.
-Maximum temperature spans 30.537 to 36.603\,\textdegree{}C.
-Figure~\ref{fig:stats_dashboard}(b) and (e) show energy and overhead split into clear controller families.
-The family structure appears as separated bands rather than overlapping clouds.
-That banded shape implies controller class dominates outcome variance more than run to run noise.
-GS+LSTM+PPO and MPC are 34.737 and 35.021~Wh.
-Their overhead values are 2.951\% and 2.975\%.
-LSTM+PPO and MPC are near 40~Wh.
-Their overhead values are 3.388\% and 3.398\%.
-MLP+PPO variants are near 57.8~Wh with overhead near 4.91\%.
-PID and UniformFlow are near 368~Wh with overhead near 31.3\%.
-Panel (c) isolates spatial temperature spread, which serves as a primary indicator of localized hotspot mitigation.
-GS+LSTM+PPO restricted the maximum inter zone temperature spread to 1.07\,\textdegree{}C and the mean spread to 0.55\,\textdegree{}C, representing a >50\% reduction in spatial gradients compared to the AdaptivePID baseline, which produced a maximum spread of 2.16\,\textdegree{}C.
-This improvement in thermal uniformity is relevant to cell longevity, as previous studies have shown that thermal gradients as small as 3\,\textdegree{}C are associated with substantially accelerated inhomogeneous degradation mechanisms~\cite{Li2023}.
-The ablations lacking temporal memory (GS+PPO) reverted to reactive, localized flow redistribution, failing to eliminate thermal gradients and yielding a maximum spread of 2.11\,\textdegree{}C.
-Panel (d) shows stress distributions consistent with spread behavior.
-Panel (f) correlation structure follows the same pattern.
-Pump energy and overhead are almost perfectly aligned at 1.000.
-Mean temperature and overhead have strong negative correlation at -0.995.
-Thermal stress and pump energy correlate at -0.891.
-The correlation matrix has strong blocks near \(\pm 1\), indicating a tightly coupled metric geometry where improving one axis predictably moves several others.
+The statistical distributions in Figure 5 confirm that architectural class dominates performance variance more than stochastic noise. The "banded" structure in panels (b) and (e) shows that GS+LSTM+PPO and MPC form a high-efficiency family (around 160 Wh), while AdaptivePID and UniformFlow form a high-intensity safety-first family (around 339 Wh).
+
+Panel (c) isolates spatial temperature spread, a primary indicator of localized hotspot mitigation. GS+LSTM+PPO restricted the maximum inter-zone temperature spread to 1.07 °C, a more than 50\% reduction compared to the AdaptivePID baseline (2.16 °C). This improvement in thermal uniformity is critical for mitigating inhomogeneous degradation mechanisms that accelerate when thermal gradients exceed 3 °C \cite{Li2023}. The correlation matrix (panel f) confirms a tightly coupled metric geometry where pump energy and overhead are perfectly aligned, while mean temperature and energy exhibit a strong negative correlation, highlighting the inherent safety-efficiency tradeoff.
 
 \subsubsection*{Spatial behavior analysis}
 
-\vspace{-0.35em}
 \begin{figure*}[!tb]
   \centering
   \includegraphics[width=\textwidth,keepaspectratio]{replots_from_csv/05_spatial_dashboard_available_runs.pdf}
-  \caption{Spatial dashboard for measured runs with four subplots: (a) zone average temperature heatmap, (b) zone temperature spread profile, (c) interface gradient statistics, and (d) mean zone flow allocation.}\label{fig:spatial_dashboard}
+  \caption{Spatial Thermal Balancing: Graph-aware allocation suppresses localized hotspots, reducing inter-zone gradients compared to spatially-blind global cooling.}\label{fig:spatial_dashboard}
 \end{figure*}
-\vspace{-0.45em}
 
-Figure~\ref{fig:spatial_dashboard}(a) compares zone level thermal fields for measured runs.
-The heatmap shows a persistent spatial gradient shape across zones rather than random hot spot switching.
-This implies structural heat flow paths in the pack are repeatedly excited by the same drive events.
-PID has the coolest spatial profile.
-Its zone mean range is 27.852 to 29.402\,\textdegree{}C.
-MPC follows with 31.500 to 33.920\,\textdegree{}C.
-MLP+PPO is warmest with 32.083 to 35.693\,\textdegree{}C.
-Panel (b) shows zone variance increasing in the same order.
-Mean zone standard deviation is 1.070 for PID.
-It is 1.601 for MPC.
-It is 2.189 for MLP+PPO.
-Panel (c) shows interface gradients remain moderate in all runs.
-The mean absolute interface gradient is 0.151\,\textdegree{}C for PID.
-It is 0.230\,\textdegree{}C for MPC.
-It is 0.330\,\textdegree{}C for MLP+PPO.
-Panel (d) shows that flow allocation differs strongly.
-Its profile shape is near uniform high for PID, sparse low for MLP+PPO, and intermediate structured allocation for MPC.
-PID runs near full flow in all zones.
-Its mean normalized zone flow is 0.999.
-MPC averages 0.091.
-MLP+PPO averages 0.005.
-This spatial pattern is consistent with the large energy gap.
+Spatial field comparisons (Fig 6a) reveal persistent thermal patterns rather than stochastic hotspot switching, implying that structural heat flow paths are repeatedly excited by drive events. While MPC maintains the coolest spatial profile, the learned MLP+PPO policy achieves a more uniform temperature distribution across the twelve zones (panel b).
 
-\vspace{-0.35em}
+The flow allocation heatmap (panel d) illustrates the difference in strategy: PID maintains a near-uniform high flow (mean 0.999), whereas MPC and MLP+PPO employ structured, sparse allocation. This targeted flow redistribution is what allows the predictive models to suppress hotspots (panel c) without the excessive energy overhead of the global cooling baselines.
+
+\subsubsection*{Control action behavior}
+
 \begin{figure*}[!tb]
   \centering
   \includegraphics[width=\textwidth,keepaspectratio]{replots_from_csv/06_control_aggressiveness_strategy_tuned.pdf}
   \caption{Control behavior dashboard with four subplots: (a) maximum zone flow traces, (b) control spectrum, (c) smoothness metric, and (d) strategy diversity index.}\label{fig:control_aggressiveness}
 \end{figure*}
-\vspace{-0.45em}
 
-\subsubsection*{Control action behavior}
-
-Figure~\ref{fig:control_aggressiveness}(a) reports action dynamics for measured runs.
-Maximum zone flow has a wide range for PID.
-Its range is 0.000 to 1.000.
-MLP+PPO ranges from 0.000 to 0.691.
-MPC ranges from 0.000 to 0.344.
-Panel (b) shows MPC allocating control effort across a broader frequency content than PID and MLP+PPO.
-Panel (c) indicates smoother command transitions for MLP+PPO and more actively modulated control for MPC.
-The smoothness traces imply MPC behaves as a continuously correcting controller, while PID exhibits burst like corrections tied to threshold excursions.
-Panel (d) diversity index separates control regimes.
-MPC has the highest value at 0.4999.
-MLP+PPO is 0.0111.
-PID is 0.0046.
-These values indicate different allocation strategies.
-PID uses near uniform high flow.
-MPC uses lower but more varied flow.
-MLP+PPO uses sparse and low flow most of the time.
-These control patterns align with energy and temperature outcomes.
+The dynamics of maximum zone flow (Fig 7a) highlight the relative "aggressiveness" of the controllers. The smoothness traces and diversity index (panels c and d) separate the control regimes: MPC behaves as a continuously correcting controller (diversity 0.4999), while PID exhibits burst-like corrections (diversity 0.0046) tied to threshold excursions. These distinct actuation philosophies align with the observed energy and temperature outcomes, with smoother, more predictive commands generally correlating with lower energy use and improved spatial balancing.
 
 \subsubsection*{Multidimensional performance comparison}
 
-\vspace{-0.35em}
 \begin{figure*}[!tb]
   \centering
   \includegraphics[width=\textwidth,keepaspectratio]{replots_from_csv/07_radar_top6.pdf}
-  \caption{Multidimensional comparison of six controllers across six objective axes where larger radius means better score: spread, mean temperature, maximum temperature, efficiency, pump energy, and thermal stress.}\label{fig:radar}
+  \caption{Multidimensional Performance: Radar analysis confirms no single controller dominates all objectives; selection should follow application-specific priorities for safety vs. efficiency.}\label{fig:radar}
 \end{figure*}
-\vspace{-0.45em}
 
-Figure~\ref{fig:radar} highlights why single metric ranking can be misleading.
-The top six set combines low energy models and low temperature models.
-GS+LSTM+PPO and MPC anchor the efficiency side.
-Their pump energies are 34.737 and 35.021~Wh.
-Their overhead is below 3\%.
-AdaptivePID and UniformFlow anchor the temperature side.
-Both reach 30.537\,\textdegree{}C maximum temperature.
-Both require 368.444~Wh.
-PID remains close with 30.634\,\textdegree{}C and 367.121~Wh.
-MPC sits between these extremes.
-It reaches 34.852\,\textdegree{}C at 39.995~Wh.
-Axis by axis, GS+LSTM+PPO and MPC project farther on efficiency and pump energy, while AdaptivePID and UniformFlow project farther on mean and maximum temperature.
-PID occupies nearly the same temperature region as AdaptivePID but remains slightly weaker on energy and efficiency.
-MPC occupies the intermediate polygon area and therefore acts as a compromise baseline across all six axes.
-The polygon shapes are non concentric and intersecting, which implies no monotonic dominance relation across objectives.
-The practical implication is that controller selection should follow application priorities rather than a single universal score.
-No controller is best on every axis.
-The radar therefore supports a tradeoff based selection.
+Figure 8 summarizes the performance across six objective axes. The intersecting polygons demonstrate that no single method dominates all objectives. GS+LSTM+PPO and its ablations anchor the efficiency and pump energy axes, while AdaptivePID and UniformFlow project farthest on the safety (temperature) axes. The practical implication is that controller selection should be driven by application priorities: learned predictive models offer a balanced solution for gradient-sensitive packs under moderate energy constraints, while classical baselines remain appropriate for high-demand bulk cooling where energy is secondary.
 
 \subsubsection*{Overall synthesis}
 
-Overall, the results demonstrate that while all controllers maintain safe operation below 40\,\textdegree{}C, their energy efficiency varies by an order of magnitude.
-The GS+LSTM+PPO and MPC families achieve approximately 35~Wh with overhead below 3\%, whereas PID and UniformFlow baselines require nearly 368~Wh (31.3\% overhead).
-This performance gap, visualized across temporal and spatial panels, stems from the difference between sustained high flow in reactive methods and the targeted, lower flow allocation employed by the PROPOSED models.
-Ultimately, no single method dominates all objectives, but GS+LSTM+PPO emerges as a balanced candidate for energy efficient deployment.
+Overall, the results demonstrate that while all controllers maintain safe operation below 40 °C, their energy efficiency and spatial regulation vary significantly. The learned GS+LSTM+PPO policy achieves a balanced result of 158.11 Wh with 21.34% overhead, whereas the classical AdaptivePID baseline requires 339.17 Wh (45.78% overhead) to maintain its lower bulk temperatures. This performance gap, visualized across temporal and spatial panels, stems from the difference between sustained high flow in reactive methods and the targeted, lower flow allocation employed by the learned models. Ultimately, no single method dominates all objectives, but GS+LSTM+PPO emerges as a balanced candidate for deployment, providing superior spatial thermal balancing and reduced inter-zone gradients (1.07 °C vs 2.16 °C) compared to classical baselines.
 
 \section*{Discussion}
 
-The empirical results highlight a nuanced tradeoff between classical and learned control strategies.
-AdaptivePID achieved the highest aggregate reward, driven largely by its inherent mathematical smoothness which avoided continuous action exploration penalties.
-However, AdaptivePID functions as a brute force global cooler, remaining entirely blind to internal pack heterogeneity.
-In contrast, GS+LSTM+PPO prioritizes spatial balancing, sacrificing minor bulk cooling efficiency to suppress localized hotspots through anticipatory flow redistribution.
-This suggests that while classical control is optimal for uniform thermal masses, advanced battery pack geometries with severe thermal gradients justify the deployment of graph based predictive policies.
+The empirical results highlight a nuanced tradeoff between classical and learned control strategies. AdaptivePID achieved the highest aggregate reward, driven largely by its inherent mathematical smoothness which avoided continuous action exploration penalties. However, AdaptivePID functions as a safety-first global cooler, achieving 31.14 °C bulk temperature at the highest energy cost (339.17 Wh). In contrast, GS+LSTM+PPO prioritizes spatial balancing, sacrificing minor bulk cooling efficiency (achieving 35.60 °C at 158.11 Wh) to suppress localized hotspots through anticipatory flow redistribution. This suggests that while classical control is effective for uniform thermal regulation, advanced battery pack geometries with severe thermal gradients justify the deployment of graph based predictive policies.
 
-Actuation smoothness is another important signal.
-GS+LSTM+PPO shows the narrowest flow change distribution, and we attribute this behaviour to the model's forward looking state representation, which reduces the need for repeated corrective bursts.
-That may be consequential beyond short simulations because pumps, valves, and fans accumulate wear over long service horizons.
+Actuation smoothness is another important signal. GS+LSTM+PPO shows the narrowest flow change distribution, and we attribute this behaviour to the model's forward looking state representation, which reduces the need for repeated corrective bursts. That may be consequential beyond short simulations because pumps, valves, and fans accumulate wear over long service horizons.
 
-Spatial evidence strongly supports the use of targeted regulation for gradient suppression.
-Spatially aware allocation effectively restricted internal thermal gradients to a maximum of 1.07\,\textdegree{}C, representing an approximate 50 percent reduction compared to classical baselines.
-This improved thermal uniformity is associated with a mitigated risk of uneven degradation and aging imbalance across parallel connected cells, as discussed in recent experimental studies~\cite{Iriyama2024}.
-While adaptive classical control manages bulk temperature efficiently, the localized flow redistribution provided by GraphSAGE specifically targets the spatial drivers of inhomogeneous aging.
-Consequently, the predictive balancing approach offers a path toward improved longevity in multi zone packs where nonuniform temperature distributions are known to contribute to accelerated performance loss~\cite{Li2023}.
+Spatial evidence strongly supports the use of targeted regulation for gradient suppression. Spatially aware allocation effectively restricted the maximum inter-zone temperature spread to 1.07 °C, representing a substantial reduction compared to the 2.16 °C produced by the AdaptivePID baseline. This improved thermal uniformity is associated with a mitigated risk of uneven degradation and aging imbalance across parallel connected cells, as discussed in recent experimental studies \cite{Iriyama2024}. While adaptive classical control manages bulk temperature efficiently (achieving 31.14 °C), the localized flow redistribution provided by GraphSAGE specifically targets the spatial drivers of inhomogeneous aging without requiring the excessive energy consumption (339.17 Wh) of global cooling baselines. Consequently, the predictive balancing approach may contribute to more uniform operating conditions in multi zone packs where nonuniform temperature distributions are known to contribute to accelerated performance loss \cite{Li2023}. All evaluated controllers, including the learned architectures and their ablations, maintained peak temperatures within the 40 °C safety threshold.
 
-In our view, the practical value of the approach is the joint design of prediction and control in one closed loop architecture.
-The next step is hardware validation under sensor noise, actuator lag variation, and coolant network effects that are harder to emulate fully in simulation.
-We also speculate that uncertainty aware extensions and lightweight online adaptation could improve robustness further, especially for rare excursion events.
+In our view, the practical value of the approach is the joint design of prediction and control in one closed loop architecture. The next step is hardware validation under sensor noise, actuator lag variation, and coolant network effects that are harder to emulate fully in simulation. We also speculate that uncertainty aware extensions and lightweight online adaptation could improve robustness further, especially for rare excursion events.
 
 \section*{Data availability}
-Raw drive schedules are sourced from public EPA and DieselNet repositories cited here.
-The generated dataset used in this manuscript is built with the preprocessing pipeline in our repository~\cite{KeshavRepo2026}.
-The repository link is https://github.com/Keshavj-13/reserch_code.
-Input schedule files are stored under the directory drive_cycles.
-Processed arrays and generated datasets are stored as X_dataset.npy, Y_dataset.npy,
-core_plus_generated.csv, simulated_battery_cooling.csv, and related checkpoint exports.
-Controller outputs and analysis tables are stored under results and cropped_result directories.
-These files are versioned in the same repository and can be accessed directly.
-All preprocessing parameters and schedule identifiers needed for reconstruction are included.
+Raw drive schedules are sourced from public EPA and DieselNet repositories cited here. The generated dataset used in this manuscript is built with the preprocessing pipeline in our repository \cite{KeshavRepo2026}. The repository link is https://github.com/Keshavj-13/reserch_code. Input schedule files are stored under the directory drive_cycles. Processed arrays and generated datasets are stored as X_dataset.npy, Y_dataset.npy, core_plus_generated.csv, simulated_battery_cooling.csv, and related checkpoint exports. Controller outputs and analysis tables are stored under results and cropped_result directories. These files are versioned in the same repository and can be accessed directly. All preprocessing parameters and schedule identifiers needed for reconstruction are included.
 
 \section*{Code availability}
-The full codebase is available at https://github.com/Keshavj-13/reserch_code~\cite{KeshavRepo2026}.
-The repository contains data preprocessing scripts, electrothermal simulation notebooks,
-reinforcement learning training pipelines, controller baseline implementations,
-evaluation scripts, and plotting workflows used to generate manuscript figures.
-Environment setup files are provided, including dependency specifications for reproducible execution.
-The repository also contains saved checkpoints and output tables used in the comparative analysis.
+The full codebase is available at https://github.com/Keshavj-13/reserch_code \cite{KeshavRepo2026}. The repository contains data preprocessing scripts, electrothermal simulation notebooks, reinforcement learning training pipelines, controller baseline implementations, evaluation scripts, and plotting workflows used to generate manuscript figures. Environment setup files are provided, including dependency specifications for reproducible execution. The repository also contains saved checkpoints and output tables used in the comparative analysis.
 
 \section*{Author contributions}
-Mukesh Singh and Keshav Juneja conceived the study objectives and research scope.
-Both authors designed the predictive control framework and evaluation methodology.
-Keshav Juneja implemented simulation environments and data processing workflows.
-Keshav Juneja trained reinforcement learning policies and baseline controller variants.
-Mukesh Singh reviewed modeling assumptions and validated technical consistency.
-Both authors analyzed quantitative outputs and interpreted controller trade patterns.
-Keshav Juneja generated visualizations and maintained experiment tracking records.
-Mukesh Singh contributed domain framing and application focused interpretation.
-Both authors drafted manuscript sections and revised technical wording collaboratively.
-Both authors approved the final manuscript version for submission.
-Both authors agree to accountability for the accuracy of reported results.
-Both authors contributed substantially to all major phases of this work.
-Both authors reviewed source code and verified reproducibility of final reported metrics.
-Both authors discussed limitations and approved all methodological clarifications in revision.
-Both authors accept responsibility for data integrity and manuscript accuracy.
+Mukesh Singh and Keshav Juneja conceived the study objectives and research scope. Both authors designed the predictive control framework and evaluation methodology. Keshav Juneja implemented simulation environments and data processing workflows. Keshav Juneja trained reinforcement learning policies and baseline controller variants. Mukesh Singh reviewed modeling assumptions and validated technical consistency. Both authors analyzed quantitative outputs and interpreted controller trade patterns. Keshav Juneja generated visualizations and maintained experiment tracking records. Mukesh Singh contributed domain framing and application focused interpretation. Both authors drafted manuscript sections and revised technical wording collaboratively. Both authors approved the final manuscript version for submission. Both authors agree to accountability for the accuracy of reported results. Both authors contributed substantially to all major phases of this work. Both authors reviewed source code and verified reproducibility of final reported metrics. Both authors discussed limitations and approved all methodological clarifications in revision. Both authors accept responsibility for data integrity and manuscript accuracy.
 
 \section*{Competing interests}
-The authors declare no financial interests related to this research study.
-The authors declare no personal relationships that influenced reported outcomes.
-No external sponsor directed methodology, analysis choices, or reporting language.
-The work was conducted with independent academic intent and technical judgment.
-No paid consultancy informed controller design or benchmarking decisions.
-No patent applications are linked to the presented methods or results.
-No proprietary dataset access created selective reporting advantages.
-Model evaluation criteria were defined before comparative analysis was finalized.
-All major assumptions are documented in the manuscript and Methods section.
-Limitations are described to support transparent interpretation of findings.
-The authors report results in good faith without known conflicts.
-The corresponding author confirms this declaration on behalf of both authors.
-No non academic partnership influenced interpretation of comparative controller performance results.
-No undisclosed funding source affected data access, preprocessing choices, or reporting emphasis.
-All conflict related declarations were reviewed jointly before manuscript submission.
-
+The authors declare no financial interests related to this research study. The authors declare no personal relationships that influenced reported outcomes. No external sponsor directed methodology, analysis choices, or reporting language. The work was conducted with independent academic intent and technical judgment. No paid consultancy informed controller design or benchmarking decisions. No patent applications are linked to the presented methods or results. No proprietary dataset access created selective reporting advantages. Model evaluation criteria were defined before comparative analysis was finalized. All major assumptions are documented in the manuscript and Methods section. Limitations are described to support transparent interpretation of findings. The authors report results in good faith without known conflicts. The corresponding author confirms this declaration on behalf of both authors. No non academic partnership influenced interpretation of comparative controller performance results. No undisclosed funding source affected data access, preprocessing choices, or reporting emphasis. All conflict related declarations were reviewed jointly before manuscript submission.
 
 \begin{thebibliography}{99}
 
@@ -1264,34 +709,34 @@ United States Environmental Protection Agency,
 Dynamometer Drive Schedules,
 Vehicle and Fuel Emissions Testing web pages,
 Accessed: 2026 02 26,
-Available: https://www.epa.gov/vehicle-and-fuel-emissions-testing/dynamometer-drive-schedules. % :contentReference[oaicite:6]{index=6}
+Available: https://www.epa.gov/vehicle-and-fuel-emissions-testing/dynamometer-drive-schedules.
 
 \bibitem{EPA_FTP}
 United States Environmental Protection Agency,
 EPA Federal Test Procedure FTP,
 Emission standards reference guide,
 Accessed: 2026 02 26,
-Available: https://www.epa.gov/emission-standards-reference-guide/epa-federal-test-procedure-ftp. % :contentReference[oaicite:7]{index=7}
+Available: https://www.epa.gov/emission-standards-reference-guide/epa-federal-test-procedure-ftp.
 
 \bibitem{EPA_UDDS}
 United States Environmental Protection Agency,
 Urban Dynamometer Driving Schedule UDDS,
 Emission standards reference guide,
 Accessed: 2026 02 26,
-Available: https://www.epa.gov/emission-standards-reference-guide/epa-urban-dynamometer-driving-schedule-udds. % :contentReference[oaicite:8]{index=8}
+Available: https://www.epa.gov/emission-standards-reference-guide/epa-urban-dynamometer-driving-schedule-udds.
 
 \bibitem{EPA_LA92}
 United States Environmental Protection Agency,
 LA92 Unified Dynamometer Driving Schedule,
 Emission standards reference guide,
 Accessed: 2026 02 26,
-Available: https://www.epa.gov/emission-standards-reference-guide/la92-unified-dynamometer-driving-schedule. % :contentReference[oaicite:9]{index=9}
+Available: https://www.epa.gov/emission-standards-reference-guide/la92-unified-dynamometer-driving-schedule.
 
 \bibitem{DieselNet_Cycles}
 ECOpoint Inc, DieselNet,
 Emission test cycles collection, including FTP75, UDDS, HWFET, US06, SC03, and LA92,
 Accessed: 2026 02 26,
-Available: https://dieselnet.com/standards/cycles/. % :contentReference[oaicite:10]{index=10}
+Available: https://dieselnet.com/standards/cycles/.
 
 \bibitem{Li2023}
 S. Li, C. Zhang, Y. Zhao, G. J. Offer, and M. Marinescu, ``Effect of thermal gradients on inhomogeneous degradation in lithium-ion batteries,'' \textit{Communications Engineering}, vol. 2, art. no. 74, 2023, doi:10.1038/s44172-023-00124-w.
@@ -1306,10 +751,5 @@ GitHub repository,
 2026,
 Available: https://github.com/Keshavj-13/reserch_code.
 \end{thebibliography}
-\vfill
-\end{document}
 
 \end{document}
-d{document}
-t}
-}
